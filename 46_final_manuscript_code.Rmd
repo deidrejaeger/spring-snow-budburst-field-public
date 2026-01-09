@@ -1,0 +1,3001 @@
+---
+title: "46_final_manuscript_code"
+author: "Deidre Jaeger"
+date: "1/9/2026"
+output: html_document
+---
+
+---
+title: "41_ss_manuscript_figs-stats-field"
+author: "Deidre Jaeger"
+date: "8/14/2023"
+output: pdf_document
+---
+
+# Standalone script to generate the results for the manuscript figures, tables, text for the field paper, and supplementary materials
+
+Table of contents
+Methods Figs
+Fig.1 -  spatial map: impervious surface/land codes
+
+Results Figs
+Fig. 2 - intraurban phenological variation -boxplots
+Fig. 3 - intraurban phenological variation -spatial
+Fig. 4 - frost damage pics
+Fig. 5 - scatter plots: temp and phenology
+Fig. 6 - scatter plot imp surface / and phenology 
+Fig. 7 - bar graphs: land use and phenology
+
+Results text, tables
+3.1 Intra-urban phenological variation 
+3.2 Abiotic and biotic predictors of tree phenology
+3.2.1 Intra-urban temperature relationship with phenology
+3.2.2 Impervious surface relationship with phenology
+3.2.3 Land-use zones relationships with phenology
+3.2.4 Tree size and phenology
+
+3.3 Temperature variation and landscape relationships
+3.3.1 Intraurban temperature departures 
+3.3.2 Impervious surface, elevation, light, distance to city center  relationship with temperature
+3.3.3 Land cover relationship with temperature
+
+Appendix A: Supplementary Data
+SM 1. Identification of 'Spring Snow' clones 
+SM 2. Map of sites
+SM 3. Phenological growth stages
+SM 4. Temperature records by site
+SM 5. Land-use Zones
+SM 6.  Methods for estimating relative light
+SM 7. Phenological departure methods and results
+SM 8. Tree age and size results
+SM 9. Temperature variation results
+SM 10. Impervious surface radii results
+SM 11. Elevation, light, and distance to city center results
+SM 12. Land-use zone results
+
+
+```{r load functions}
+source("functions/plot.temp.data.R")
+```
+
+```{r load-libraries}
+
+library(ggthemes) # for a cleaner map withouth coordinates and axis labels
+library(ggplot2)
+library(dplyr)
+library(ggrepel)
+library(ggspatial) # for scale  bars
+library(rgdal) # needed to read in boulder shapefile
+library(raster) # for spatial extents and crs
+# library(tidyr) #for pivot
+library(lubridate)
+library(gridExtra)
+library(ggpubr) # for box plots
+# install.packages("ggspatial")
+# library(ggspatial)
+library(lme4) # for lmer
+library(lmerTest) # for lmer p values based on degrees of freedom
+
+
+```
+
+Methods
+
+# Fig. 1 -  spatial map: impervious surface/land codes
+
+```{r impervious surface -zones}
+boulder_outline <- readOGR("/Users/deidrejaeger/Documents/Career/CU-Boulder/Research/spring-snow-phenology/spatial_data/BoulderCityLimits/BoulderCityLimits.shp")
+
+jul_chill_2021.d.ft <- read.csv(file = "data/chilling_forcing_days/2021/days_to_dyn_chill_ft21.csv")
+
+p.imp <- jul_chill_2021.d.ft %>% 
+    ggplot() +  
+    geom_point(aes(x=coords.x1, y=coords.x2, color = pA250),  size = 5) +
+  geom_point(aes(x=coords.x1, y=coords.x2, color = pA250),  size = 5, shape = 1, color = "black") +
+    geom_polygon(data=boulder_outline, aes(x=long, y=lat, group=group), 
+                 fill=NA,color="black", size=0.75) +
+    scale_color_gradient(low="bisque1", high ="black", name = " Proportion of \n impervious surface\n 250 m radius", limits= c(0,1)) +
+    coord_equal() +
+    theme_map() +
+    theme(legend.position="right") +
+    theme(legend.key.width=unit(3, "cm"), 
+      legend.text = element_text(size = 14),
+      legend.title = element_text(size = 14, face = "bold")) 
+p.imp
+
+# save this plot 
+png("images/Field-manuscript-figs/Final-figs-field/fig-5-impervious-surface-boulder.png")
+p.imp
+dev.off()
+```
+
+# Results
+# Fig. 2 - intraurban phenological variation -boxplots
+
+```{r fig. 2. horizontal annual phenoplot-julian-day}
+# load data
+pheno.f <- read.csv("data/field-data-2019-2021/field-data-by-site-all_phenophase_by_site_jul_and_dep.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# filter to just leaf open and flower emerge
+pheno.f.lo.ft <- pheno.f %>%
+  filter(phenophase == "leafopen" | phenophase == "floweremerge")
+
+pheno.f.lo.ft$phenophase <- factor(pheno.f.lo.ft$phenophase, levels = c("floweremerge","leafopen"))
+
+min(pheno.f.lo.ft$jul0.5_0.2)
+max(pheno.f.lo.ft$jul0.5_0.2)
+
+
+f3 <- ggboxplot(pheno.f.lo.ft, x = "phenophase", y = "jul0.5_0.2", width = 0.5,  ylab = "Julian day", xlab =  "Phenophase", color = "phenophase",  palette = c("steelblue3", "seagreen")) +
+  # font("xlab", size = 16) +
+  # font("ylab", size = 16)+
+  # font("legend.text", size = 16)+
+  # font("legend.title", size = 16)+
+ facet_grid(rows = vars(year), scales='free_x', space='free_x') +
+ scale_x_discrete(expand = c(-1,-1)) +
+  scale_y_continuous(breaks=seq(75,130,5)) +
+   coord_flip()+
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45,  hjust=1, size = 24), 
+        axis.text.y = element_text(size = 24), 
+        axis.title.x = element_text(size = 24), 
+        axis.title.y = element_text(size = 24, vjust=1.8)) +
+  theme(strip.text.y = element_text(size = 20)) +
+  theme(legend.title = element_text(size = 20), 
+        legend.text = element_text(size = 20))
+
+f3 
+
+png("images/Field-manuscript-figs/Final-figs-field/fig-3-annual-pheno-boxplots.png", width = 800, height = 607)
+f3
+dev.off()
+
+
+```
+
+# Fig. 3 - spatial map: phenology spread 
+
+```{r load-data-fig3}
+# open 2019 and 2020, 2021 phenology data
+df_19.lo <- read.csv("data/2020-field-data/2019-2020-50%-phenos-deviations/df_19.lo.csv")
+df_20.lo <- read.csv("data/2020-field-data/2019-2020-50%-phenos-deviations/df_20.lo.csv")
+df_21.lo <- read.csv(file = "data/2021-field-data/2021-50%-phenos-deviations/df_21.lo.csv")
+
+f_t_dat_lo19.21.t <- read.csv(file = "data/outputs/combined-temp-pheno-dat/leafout-temp-dep-2019-20-21.by-site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+
+f_t_dat_ft19.21.t <- read.csv(file = "data/outputs/combined-temp-pheno-dat/flower-tip-temp-dep-2019-20-21.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+```
+
+```{r phenology-anomoly-color-pop-leaves-flowers}
+# combine df.4.l and df.4.f
+
+#prep leafout data
+df.4.l <- f_t_dat_lo19.21.t %>%
+  dplyr::group_by(Site) %>% 
+  summarize(jul0.5_tglo = mean(jul0.5_tglo, na.rm = TRUE), jul0.5_TGLO_d_mn = mean(jul0.5_TGLO_d, na.rm = TRUE), jul0.5_TGLO_d_sd = sd(jul0.5_TGLO_d, na.rm = TRUE), average_minTdep_fullyr = mean(average_minTdep_fullyr), coords.x1 = mean(coords.x1), coords.x2 = mean(coords.x2)) %>%
+  mutate_all(~ifelse(is.nan(.), NA, .)) %>% 
+  mutate(Site = as.factor(Site))
+
+
+df.4.l.c <- df.4.l %>% 
+  mutate(phenophase = "leafout", anomoly_days_m = jul0.5_TGLO_d_mn, anomoly_days_sd = jul0.5_TGLO_d_sd) %>% 
+  dplyr::select(Site, phenophase,anomoly_days_m, anomoly_days_sd, average_minTdep_fullyr, coords.x1, coords.x2)
+
+# prep flowering data
+# group by site and average across 2019-2021
+df.4.f <- f_t_dat_ft19.21.t %>%
+  group_by(Site) %>% 
+  summarize(jul0.2_tgft = mean(jul0.2_tgft, na.rm = TRUE), jul0.2_TGFT_d_mn = mean(jul0.2_TGFT_d, na.rm = TRUE), jul0.2_TGFT_d_sd = sd(jul0.2_TGFT_d, na.rm = TRUE), average_minTdep_fullyr = mean(average_minTdep_fullyr), coords.x1 = mean(coords.x1), coords.x2 = mean(coords.x2)) %>% 
+  mutate_all(~ifelse(is.nan(.), NA, .)) %>% 
+  mutate(Site = as.factor(Site))
+
+
+df.4.f.c <- df.4.f %>% 
+  mutate(phenophase = "flowertips", anomoly_days_m = jul0.2_TGFT_d_mn, anomoly_days_sd = jul0.2_TGFT_d_sd) %>% 
+  dplyr::select(Site, phenophase,anomoly_days_m, anomoly_days_sd, average_minTdep_fullyr, coords.x1, coords.x2)
+
+# combine
+df.4.l.f.c <- rbind(df.4.f.c, df.4.l.c)
+
+#order the phenophase factor levels
+df.4.l.f.c$phenophase <- factor(df.4.l.f.c$phenophase, levels= c("leafout", "flowertips"), ordered = TRUE)
+
+# revalue the levels
+df.4.l.f.c$phenophase <- recode_factor(df.4.l.f.c$phenophase, "leafout" = "Leaf opening", "flowertips" = "Flower emergence")
+
+dataset1 = df.4.l.f.c
+colm_interest = "anomoly_days_m"
+low_col= "forestgreen"
+high_col = "purple"
+legend_lab= "Average departure (days)"
+lower_lim = -14
+upper_lim = 13
+
+
+ #load outline of boulder
+  boulder_outline <- readOGR("/Users/deidrejaeger/Documents/Career/CU-Boulder/Research/spring-snow-phenology/spatial_data/BoulderCityLimits/BoulderCityLimits.shp")
+  
+p4.f.c <- dataset1 %>%
+    ggplot() +  
+     geom_polygon(data=boulder_outline, aes(x=long, y=lat, group=group), 
+                 fill="white",color="black", size=0.5) +
+    geom_point(data= dataset1, aes(x=coords.x1, y=coords.x2, color = pull(dataset1, colm_interest)), size = 5) +
+  geom_point(data= dataset1, aes(x=coords.x1, y=coords.x2),shape = 1, size = 5,colour = "black")+
+    scale_colour_gradient2(name = legend_lab, low=low_col, mid = "gray",  high = high_col, midpoint=0, limits= c(lower_lim, upper_lim), expand = c(0,0), breaks = seq(lower_lim, upper_lim, 2)) +
+    coord_equal() +
+    theme_map() +
+    theme(panel.background = element_rect(fill = "white", color  =  NA), 
+          legend.background = element_rect(color = NA, fill = "white"),  
+      legend.key = element_rect(color = "black",  fill = "black"),  
+      legend.key.size = unit(2.8, "lines"),
+      legend.key.height = unit(0.8, "cm"),
+      legend.key.width = unit(1.8, "cm"),
+      legend.text = element_text(size = 14*0.8, color = "black"),  
+      legend.title = element_text(size = 12*1.2, face = "bold", hjust = 0, color = "black"), 
+      legend.position = "bottom",  
+      legend.text.align = NULL,  
+      legend.title.align = 0.5,  
+      legend.direction = "horizontal",  
+      legend.box = NULL, 
+      plot.background = element_rect(color = "white", fill = "white"), 
+      panel.border = element_blank()) +
+  guides(color = guide_colourbar(ticks.colour = "black",
+                                ticks.linewidth = 1,
+                                frame.colour = "black",
+                                frame.linewidth = 1)) +
+ theme(line = element_line(colour = "black")) +
+  facet_wrap(~phenophase)
+   # annotation_scale(location = "tl") this doesn't seem right
+p4.f.c
+
+min(df.4.l.f.c$anomoly_days_m)
+max(df.4.l.f.c$anomoly_days_m)
+  
+
+
+png("images/Field-manuscript-figs/Final-figs-field/fig-4-departure-leaves-flowertips-days-anomoly-spatial-2019-2021.png")
+p4.f.c
+dev.off()
+```
+
+# Fig. 4 - frost pics
+- made in powerpoint
+
+# Fig 5 temp and phenology
+```{r load-figure-variables}
+
+# load zones
+zone_names <- c("Business-district" = "Business-district", 
+                "Residential-high" = "Residential-high", 
+                "Residential-med" = "Residential-med", 
+                "Residential-low" = "Residential-low", 
+                "Park" = "Park")
+
+zone_colors <- c("Business-district" = "orange", 
+                 "Residential-high" = "pink", 
+                 "Residential-med" = "yellow", 
+                 "Residential-low" = "green", 
+                 "Park" = "darkgreen")
+
+zone_colors2 <- c("Business-district" = "palegreen", 
+                 "Residential-high" = "palegreen", 
+                 "Residential-med" = "palegreen", 
+                 "Residential-low" = "palegreen", 
+                 "Park" = "palegreen")
+
+
+scale_fill_manual(labels = c("Business-district" = "Business-district", 
+                             "Residential-high" = "Residential-high", 
+                             "Residential-med" = "Residential-med", 
+                             "Residential-low" = "Residential-low", 
+                             "Park" = "Park"), 
+                  values = c("Business-district" = "orange", 
+                             "Residential-high" = "pink", 
+                             "Residential-med" = "yellow", 
+                             "Residential-low" = "green", 
+                             "Park" = "darkgreen"), 
+                  name = "Zoning name")
+
+```
+
+```{r leaves and temp with error bars}
+# prep leaf data
+
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leafout-temp-dep-2019-20-21.by-site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+# make site a factor
+f_t_dat_lo19.21$Site <- as.factor(f_t_dat_lo19.21$Site)
+
+# summarize across the years
+field.d <- f_t_dat_lo19.21 %>% 
+  group_by(Site) %>% 
+   dplyr::summarize(leaf.d.all = mean(jul0.5_TGLO_d, na.rm = TRUE), temp.d.all = mean(average_minTdep_fullyr, na.rm = TRUE), zone_nam_1 = zone_nam_1) %>% 
+  distinct()
+
+
+# group by site and average across 2019-2021
+field.d <- f_t_dat_lo19.21 %>% 
+  group_by(Site) %>% 
+  dplyr::summarize(jul0.5_tglo = mean(jul0.5_tglo, na.rm = TRUE), jul0.5_TGLO_d_mn = mean(jul0.5_TGLO_d, na.rm = TRUE), jul0.5_TGLO_d_sd = sd(jul0.5_TGLO_d, na.rm = TRUE), average_minTdep_fullyr = mean(average_minTdep_fullyr), zone_nam_1 = zone_nam_1)
+
+  # mutate_all(~ifelse(is.nan(.), NA, .)) %>% 
+  # mutate(Site = as.factor(Site))
+
+
+# min temp (all months)
+lm.4 <- lm(jul0.5_TGLO_d_mn~average_minTdep_fullyr, data = field.d)
+summary(lm.4)
+cf <- coef(lm.4)
+cf # left off here 12.12.24, need to get slope of temp model
+
+# Regression intervals:
+# create a dataframe to store predictions of the budburst date
+newd.4 <- data.frame(average_minTdep_fullyr = rep(seq(min(field.d$average_minTdep_fullyr, na.rm = TRUE), max(field.d$average_minTdep_fullyr, na.rm = TRUE), length.out=100),1))
+# store predictions from lm model
+preds <- predict(lm.4,newdata=newd.4,se.fit=TRUE)
+mnlp <- preds$fit        #mean of the linear predictor
+selp <- preds$se.fit     #se of the linear predictor
+cillp <- mnlp - 2 * selp #lower of 95% CI for linear predictor
+ciulp <- mnlp + 2 * selp #upper
+
+# gather predictions into a data frame, 
+preds <- cbind(newd.4,preds,cillp,ciulp,mnlp)
+
+
+### vertical legend
+#plot the regression based on points colored by temperature departure with error bars
+p.3.l <- ggplot() +   
+  geom_point(mapping=aes(x=average_minTdep_fullyr,y=jul0.5_TGLO_d_mn, color = zone_nam_1),  data=field.d, pch = 21, size = 3, position = "jitter") +
+  geom_pointrange(data=field.d, aes(x=average_minTdep_fullyr, y =jul0.5_TGLO_d_mn, ymin=jul0.5_TGLO_d_mn-jul0.5_TGLO_d_sd, ymax=jul0.5_TGLO_d_mn+jul0.5_TGLO_d_sd, color = zone_nam_1)) +
+   scale_color_manual(labels = zone_names, values = zone_colors, name = "Land-use zone" ) +
+geom_ribbon(mapping=aes(x=average_minTdep_fullyr,ymin=cillp,ymax=ciulp),
+                alpha=0.2, color = "gray", fill = "gray", data=preds) +
+ 
+  # scale_y_continuous(breaks=seq(-15, 15, by = 5)) +
+    geom_line(mapping=aes(x=average_minTdep_fullyr,y=mnlp), color = "black",
+              data=preds) +
+  geom_hline(yintercept = 0, color = "black", linetype = "dashed", size = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linetype = "dashed", size = 0.5) +
+   ylab("Leaf opening departure (days)") +
+  xlab("Temp") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14),  
+      axis.text.y = element_text(size = 14), 
+      axis.title.x = element_text(size = 14),  
+      axis.title.y = element_text(size = 14), 
+      legend.text = element_text(size = 14),
+      legend.title = element_text(size = 14, face = "bold"),
+      legend.key.width = unit(2, 'cm'),
+      legend.position="right",
+        legend.box="vertical") 
+  # guides(colour = guide_colourbar(title.position="top", title.hjust = 0.5),
+  #        size = guide_legend(title.position="top", title.hjust = 0.5))
+p.3.l
+
+# # save this plot ( averaged across all years)
+# png("images/Field-manuscript-figs/drafts/leaf-open-field_pA250_points_temp.hlegend.png")
+# p.3.l
+# dev.off()
+```
+
+```{r flower-data-error-bars-imp-surf}
+
+# prep flower data
+
+f_t_dat_ft19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/flower-tip-temp-dep-2019-20-21.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+f_t_dat_ft19.21$Site <- as.factor(f_t_dat_ft19.21$Site)
+
+
+# group by site and average across 2019-2021
+field.d.f <- f_t_dat_ft19.21 %>% 
+  group_by(Site) %>% 
+  dplyr::summarize(jul0.2_tgft = mean(jul0.2_tgft, na.rm = TRUE), jul0.2_TGFT_d_mn = mean(jul0.2_TGFT_d, na.rm = TRUE), jul0.2_TGFT_d_sd = sd(jul0.2_TGFT_d, na.rm = TRUE), average_minTdep_fullyr = mean(average_minTdep_fullyr), zone_nam_1 = zone_nam_1)  
+
+# min temp (all months)
+lm.4 <- lm(jul0.2_TGFT_d_mn~average_minTdep_fullyr, data = field.d.f)
+summary(lm.4)
+
+# Regression intervals:
+# create a dataframe to store predictions of the budburst date
+newd.4 <- data.frame(average_minTdep_fullyr = rep(seq(min(field.d.f$average_minTdep_fullyr, na.rm = TRUE), max(field.d.f$average_minTdep_fullyr, na.rm = TRUE), length.out=100),1))
+# store predictions from lm model
+preds <- predict(lm.4,newdata=newd.4,se.fit=TRUE)
+mnlp <- preds$fit        #mean of the linear predictor
+selp <- preds$se.fit     #se of the linear predictor
+cillp <- mnlp - 2 * selp #lower of 95% CI for linear predictor
+ciulp <- mnlp + 2 * selp #upper
+
+# gather predictions into a data frame, 
+preds <- cbind(newd.4,preds,cillp,ciulp,mnlp)
+
+#plot the regression based on points colored by temperature departure with error bars
+p.3.f <- ggplot() +   
+  geom_point(mapping=aes(x=average_minTdep_fullyr,y=jul0.2_TGFT_d_mn, color = zone_nam_1),  data=field.d.f, pch = 21, size = 3, position = "jitter") +
+  scale_color_manual(labels = zone_names, values = zone_colors, name = "Land-use zone" ) +
+  geom_pointrange(data=field.d.f, aes(x=average_minTdep_fullyr, y =jul0.2_TGFT_d_mn, ymin=jul0.2_TGFT_d_mn-jul0.2_TGFT_d_sd, ymax=jul0.2_TGFT_d_mn+jul0.2_TGFT_d_sd, color = zone_nam_1)) +
+geom_ribbon(mapping=aes(x=average_minTdep_fullyr,ymin=cillp,ymax=ciulp),
+                alpha=0.2, color = "gray", fill = "gray", data=preds) +
+  # scale_y_continuous(breaks=seq(-15, 15, by = 5)) +
+    geom_line(mapping=aes(x=average_minTdep_fullyr,y=mnlp), color = "black",
+              data=preds) +
+  geom_hline(yintercept = 0, color = "black", linetype = "dashed", size = 0.5) +
+  geom_vline(xintercept = 0, color = "black", linetype = "dashed", size = 0.5) +
+   ylab("Flower emergence departure (days)") +
+  xlab("Temperature departure (°C)") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14),  
+      axis.text.y = element_text(size = 14), 
+      axis.title.x = element_text(size = 14),  
+      axis.title.y = element_text(size = 14), 
+      legend.text = element_text(size = 14),
+      legend.title = element_text(size = 14, face = "bold")) 
+p.3.f
+
+# # save this plot ( averaged across all years)
+# png("images/Field-manuscript-figs/drafts/flower-tips-field_pA250_points_temp.png")
+# p.3.f
+# dev.off()
+
+
+```
+
+```{r grid-leaf-flower-imp-temp-graph}
+grid.arrange(p.3.l, p.3.f,ncol = 1, nrow = 2)
+
+# save this plot ( averaged across all years)
+png("images/Field-manuscript-figs/leaf-open-flower-tips-field_leaf-flower-pheno-temp-colorzones.png")
+grid.arrange(p.3.l, p.3.f,ncol = 1, nrow = 2)
+dev.off()
+
+```
+
+
+# Fig 6 - scatter plots: phenology and impervious surface, colored by temp departure
+```{r load-figure-variables}
+
+# load zones
+zone_names <- c("Business-district" = "Business-district", 
+                "Residential-high" = "Residential-high", 
+                "Residential-med" = "Residential-med", 
+                "Residential-low" = "Residential-low", 
+                "Park" = "Park")
+
+zone_colors <- c("Business-district" = "red", 
+                 "Residential-high" = "orange", 
+                 "Residential-med" = "yellow", 
+                 "Residential-low" = "green", 
+                 "Park" = "darkgreen")
+
+zone_colors2 <- c("Business-district" = "palegreen", 
+                 "Residential-high" = "palegreen", 
+                 "Residential-med" = "palegreen", 
+                 "Residential-low" = "palegreen", 
+                 "Park" = "palegreen")
+
+
+scale_fill_manual(labels = c("Business-district" = "Business-district", 
+                             "Residential-high" = "Residential-high", 
+                             "Residential-med" = "Residential-med", 
+                             "Residential-low" = "Residential-low", 
+                             "Park" = "Park"), 
+                  values = c("Business-district" = "red", 
+                             "Residential-high" = "orange", 
+                             "Residential-med" = "yellow", 
+                             "Residential-low" = "green", 
+                             "Park" = "darkgreen"), 
+                  name = "Zoning name")
+
+```
+
+```{r load-imp-surface-data}
+
+imp_s.s <- read.csv("data/spatial-site-data/imp_surf.sites.csv")
+
+```
+
+```{r leaf-data-error-bars-imp-surf-legend only}
+# prep leaf data
+
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leafout-temp-dep-2019-20-21.by-site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+# make site a factor
+f_t_dat_lo19.21$Site <- as.factor(f_t_dat_lo19.21$Site)
+
+# summarize across the years
+field.d <- f_t_dat_lo19.21 %>% 
+  group_by(Site) %>% 
+   dplyr::summarize(leaf.d.all = mean(jul0.5_TGLO_d, na.rm = TRUE), temp.d.all = mean(average_minTdep_fullyr, na.rm = TRUE), zone_nam_1 = zone_nam_1) %>% 
+  distinct()
+
+
+# group by site and average across 2019-2021
+field.d <- f_t_dat_lo19.21 %>% 
+  group_by(Site) %>% 
+  dplyr::summarize(jul0.5_tglo = mean(jul0.5_tglo, na.rm = TRUE), jul0.5_TGLO_d_mn = mean(jul0.5_TGLO_d, na.rm = TRUE), jul0.5_TGLO_d_sd = sd(jul0.5_TGLO_d, na.rm = TRUE), average_minTdep_fullyr = mean(average_minTdep_fullyr)) 
+
+  # mutate_all(~ifelse(is.nan(.), NA, .)) %>% 
+  # mutate(Site = as.factor(Site))
+
+# merge data with impervious surface dataset
+field.d<- field.d %>% 
+  left_join(imp_s.s, by = "Site")
+
+# min temp (all months)
+lm.4 <- lm(jul0.5_TGLO_d_mn~pA250, data = field.d)
+summary(lm.4)
+cf <- coef(lm.4)
+cf # left off here 12.12.24, need to get slope of temp model
+
+# Regression intervals:
+# create a dataframe to store predictions of the budburst date
+newd.4 <- data.frame(pA250 = rep(seq(min(field.d$pA250, na.rm = TRUE), max(field.d$pA250, na.rm = TRUE), length.out=100),1))
+# store predictions from lm model
+preds <- predict(lm.4,newdata=newd.4,se.fit=TRUE)
+mnlp <- preds$fit        #mean of the linear predictor
+selp <- preds$se.fit     #se of the linear predictor
+cillp <- mnlp - 2 * selp #lower of 95% CI for linear predictor
+ciulp <- mnlp + 2 * selp #upper
+
+# gather predictions into a data frame, 
+preds <- cbind(newd.4,preds,cillp,ciulp,mnlp)
+
+
+### horizontal legend
+#plot the regression based on points colored by temperature departure with error bars
+p.3.l <- ggplot() +   
+  geom_point(mapping=aes(x=pA250,y=jul0.5_TGLO_d_mn, color = average_minTdep_fullyr),  data=field.d, pch = 21, size = 3, position = "jitter") +
+   scale_color_gradient(name = "Temperature \ndeparture \n(°C)", low="#1b98e0", high = "red", limits= c(-1.5, 2.5), breaks = c(-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 2.5)) +
+  geom_pointrange(data=field.d, aes(x=pA250, y =jul0.5_TGLO_d_mn, ymin=jul0.5_TGLO_d_mn-jul0.5_TGLO_d_sd, ymax=jul0.5_TGLO_d_mn+jul0.5_TGLO_d_sd, color = average_minTdep_fullyr)) +
+geom_ribbon(mapping=aes(x=pA250,ymin=cillp,ymax=ciulp),
+                alpha=0.2, color = "gray", fill = "gray", data=preds) +
+  # scale_y_continuous(breaks=seq(-15, 15, by = 5)) +
+    geom_line(mapping=aes(x=pA250,y=mnlp), color = "black",
+              data=preds) +
+  # geom_hline(yintercept = 0, color = "blue", linetype = "dotted", size = 2) +
+    # geom_vline(xintercept = 0, color = "blue", linetype = "dotted", size = 2) +
+   ylab("Leaf opening departure (days)") +
+  xlab("Proportion of impervious surface (250 m radius)") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14),  
+      axis.text.y = element_text(size = 14), 
+      axis.title.x = element_text(size = 14),  
+      axis.title.y = element_text(size = 14), 
+      legend.text = element_text(size = 14),
+      legend.title = element_text(size = 14, face = "bold"),
+      legend.key.width = unit(2, 'cm'),
+      legend.position="bottom",
+        legend.box="horizontal") 
+  # guides(colour = guide_colourbar(title.position="top", title.hjust = 0.5),
+  #        size = guide_legend(title.position="top", title.hjust = 0.5))
+p.3.l
+# # save this plot ( averaged across all years)
+# png("images/Field-manuscript-figs/drafts/leaf-open-field_pA250_points_temp.hlegend.png")
+# p.3.l
+# dev.off()
+
+### vertical expanded legend
+#plot the regression based on points colored by temperature departure with error bars
+p.3.l <- ggplot() +   
+  geom_point(mapping=aes(x=pA250,y=jul0.5_TGLO_d_mn, color = average_minTdep_fullyr),  data=field.d, pch = 21, size = 3, position = "jitter") +
+   scale_color_gradient(name = "Temperature \ndeparture \n(°C)", low="#1b98e0", high = "red", limits= c(-1.5, 2.5), breaks = c(-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 2.5)) +
+  geom_pointrange(data=field.d, aes(x=pA250, y =jul0.5_TGLO_d_mn, ymin=jul0.5_TGLO_d_mn-jul0.5_TGLO_d_sd, ymax=jul0.5_TGLO_d_mn+jul0.5_TGLO_d_sd, color = average_minTdep_fullyr)) +
+geom_ribbon(mapping=aes(x=pA250,ymin=cillp,ymax=ciulp),
+                alpha=0.2, color = "gray", fill = "gray", data=preds) +
+  # scale_y_continuous(breaks=seq(-15, 15, by = 5)) +
+    geom_line(mapping=aes(x=pA250,y=mnlp), color = "black",
+              data=preds) +
+  # geom_hline(yintercept = 0, color = "blue", linetype = "dotted", size = 2) +
+    # geom_vline(xintercept = 0, color = "blue", linetype = "dotted", size = 2) +
+   ylab("Leaf opening departure (days)") +
+  xlab("Proportion of impervious surface (250 m radius)") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14),  
+      axis.text.y = element_text(size = 14), 
+      axis.title.x = element_text(size = 14),  
+      axis.title.y = element_text(size = 14), 
+      legend.text = element_text(size = 14),
+      legend.title = element_text(size = 14, face = "bold"),
+      legend.key.width = unit(1, 'cm'),
+      legend.key.height = unit(2, 'cm'),
+      legend.position="right",
+        legend.box="vertical") 
+  # guides(colour = guide_colourbar(title.position="top", title.hjust = 0.5),
+  #        size = guide_legend(title.position="top", title.hjust = 0.5))
+p.3.l
+# # save this plot ( averaged across all years)
+# png("images/Field-manuscript-figs/drafts/leaf-open-field_pA250_points_temp.vlegend.png")
+# p.3.l
+# dev.off()
+
+#plot the regression based on points colored by temperature departure with error bars
+p.3.l <- ggplot() +   
+  geom_point(mapping=aes(x=pA250,y=jul0.5_TGLO_d_mn, color = average_minTdep_fullyr),  data=field.d, pch = 21, size = 3, position = "jitter") +
+   scale_color_gradient(name = "Temperature \ndeparture \n(°C)", low="#1b98e0", high = "red", limits= c(-1.5, 2.5), breaks = c(-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 2.5)) +
+  geom_pointrange(data=field.d, aes(x=pA250, y =jul0.5_TGLO_d_mn, ymin=jul0.5_TGLO_d_mn-jul0.5_TGLO_d_sd, ymax=jul0.5_TGLO_d_mn+jul0.5_TGLO_d_sd, color = average_minTdep_fullyr)) +
+geom_ribbon(mapping=aes(x=pA250,ymin=cillp,ymax=ciulp),
+                alpha=0.2, color = "gray", fill = "gray", data=preds) +
+  # scale_y_continuous(breaks=seq(-15, 15, by = 5)) +
+    geom_line(mapping=aes(x=pA250,y=mnlp), color = "black",
+              data=preds) +
+  # geom_hline(yintercept = 0, color = "blue", linetype = "dotted", size = 2) +
+    # geom_vline(xintercept = 0, color = "blue", linetype = "dotted", size = 2) +
+   ylab("Leaf opening departure (days)") +
+  xlab("Proportion of impervious surface (250 m radius)") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14),  
+      axis.text.y = element_text(size = 14), 
+      axis.title.x = element_text(size = 14),  
+      axis.title.y = element_text(size = 14), 
+      legend.text = element_text(size = 14),
+      legend.title = element_text(size = 14, face = "bold")) 
+  # guides(colour = guide_colourbar(title.position="top", title.hjust = 0.5),
+  #        size = guide_legend(title.position="top", title.hjust = 0.5))
+p.3.l
+
+
+# # save this plot ( averaged across all years)
+# png("images/Field-manuscript-figs/drafts/leaf-open-field_pA250_points_temp.png")
+# p.3.l
+# dev.off()
+
+```
+
+```{r flower-data-error-bars-imp-surf}
+
+# prep flower data
+
+f_t_dat_ft19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/flower-tip-temp-dep-2019-20-21.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+f_t_dat_ft19.21$Site <- as.factor(f_t_dat_ft19.21$Site)
+
+
+# group by site and average across 2019-2021
+field.d.f <- f_t_dat_ft19.21 %>% 
+  group_by(Site) %>% 
+  dplyr::summarize(jul0.2_tgft = mean(jul0.2_tgft, na.rm = TRUE), jul0.2_TGFT_d_mn = mean(jul0.2_TGFT_d, na.rm = TRUE), jul0.2_TGFT_d_sd = sd(jul0.2_TGFT_d, na.rm = TRUE), average_minTdep_fullyr = mean(average_minTdep_fullyr)) 
+
+# merge data with impervious surface dataset
+field.d.f <- field.d.f %>% 
+  left_join(imp_s.s, by = "Site")
+
+# min temp (all months)
+lm.4 <- lm(jul0.2_TGFT_d_mn~pA250, data = field.d.f)
+summary(lm.4)
+
+# Regression intervals:
+# create a dataframe to store predictions of the budburst date
+newd.4 <- data.frame(pA250 = rep(seq(min(field.d.f$pA250, na.rm = TRUE), max(field.d.f$pA250, na.rm = TRUE), length.out=100),1))
+# store predictions from lm model
+preds <- predict(lm.4,newdata=newd.4,se.fit=TRUE)
+mnlp <- preds$fit        #mean of the linear predictor
+selp <- preds$se.fit     #se of the linear predictor
+cillp <- mnlp - 2 * selp #lower of 95% CI for linear predictor
+ciulp <- mnlp + 2 * selp #upper
+
+# gather predictions into a data frame, 
+preds <- cbind(newd.4,preds,cillp,ciulp,mnlp)
+
+#plot the regression based on points colored by temperature departure with error bars
+p.3.f <- ggplot() +   
+  geom_point(mapping=aes(x=pA250,y=jul0.2_TGFT_d_mn, color = average_minTdep_fullyr),  data=field.d.f, pch = 21, size = 3, position = "jitter") +
+   scale_color_gradient(name = "Temperature \ndeparture \n(°C)", low="#1b98e0", high = "red", limits= c(-1.5, 2.5), breaks = c(-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 2.5)) +
+  geom_pointrange(data=field.d.f, aes(x=pA250, y =jul0.2_TGFT_d_mn, ymin=jul0.2_TGFT_d_mn-jul0.2_TGFT_d_sd, ymax=jul0.2_TGFT_d_mn+jul0.2_TGFT_d_sd, color = average_minTdep_fullyr)) +
+geom_ribbon(mapping=aes(x=pA250,ymin=cillp,ymax=ciulp),
+                alpha=0.2, color = "gray", fill = "gray", data=preds) +
+  # scale_y_continuous(breaks=seq(-15, 15, by = 5)) +
+    geom_line(mapping=aes(x=pA250,y=mnlp), color = "black",
+              data=preds) +
+  # geom_hline(yintercept = 0, color = "blue", linetype = "dotted", size = 2) +
+    # geom_vline(xintercept = 0, color = "blue", linetype = "dotted", size = 2) +
+   ylab("Flower emergence departure (days)") +
+  xlab("Proportion of impervious surface (250 m radius)") +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14),  
+      axis.text.y = element_text(size = 14), 
+      axis.title.x = element_text(size = 14),  
+      axis.title.y = element_text(size = 14), 
+      legend.text = element_text(size = 14),
+      legend.title = element_text(size = 14, face = "bold")) 
+p.3.f
+
+# # save this plot ( averaged across all years)
+# png("images/Field-manuscript-figs/drafts/flower-tips-field_pA250_points_temp.png")
+# p.3.f
+# dev.off()
+
+
+```
+
+```{r grid-leaf-flower-imp-temp-graph}
+grid.arrange(p.3.l, p.3.f,ncol = 1, nrow = 2)
+
+# save this plot ( averaged across all years)
+png("images/Field-manuscript-figs/leaf-open-flower-tips-field_pA250_points_temp.png")
+grid.arrange(p.3.l, p.3.f,ncol = 1, nrow = 2)
+dev.off()
+
+```
+
+# Fig 7 - bar graphs: land use and phenology
+```{r summarize -sd-se-functions}
+#+++++++++++++++++++++++++
+# Function to calculate the mean and the standard deviation
+  # for each group
+#+++++++++++++++++++++++++
+# data : a data frame
+# varname : the name of a column containing the variable
+  #to be summariezed
+# groupnames : vector of column names to be used as
+  # grouping variables
+data_summary.se <- function(data, varname, groupnames){
+  calcSE <- function(x){sd(x)/sqrt(length(x))}
+  
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      se = calcSE(x[[col]]),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+  
+ return(data_sum)
+}
+```
+
+```{r combined-leaf-flower-zone-barplot}
+# prep leaf data
+
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leafout-temp-dep-2019-20-21.by-site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+f_t_dat_lo19.21$Site <- as.factor(f_t_dat_lo19.21$Site)
+
+# summarize across the years
+field.d.leaf <- f_t_dat_lo19.21 %>% 
+  group_by(Site) %>%
+  mutate(phenophase = "leafout") %>% 
+   dplyr::summarize(phenophase = phenophase, anomoly_m = mean(jul0.5_TGLO_d, na.rm = TRUE), anomoly_sd = sd(jul0.5_TGLO_d, na.rm = TRUE), temp.d.all = mean(average_minTdep_fullyr, na.rm = TRUE), zone_nam_1 = zone_nam_1) %>%
+  distinct()
+
+# prep flower data
+
+# load data
+f_t_dat_ft19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/flower-tip-temp-dep-2019-20-21.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+f_t_dat_ft19.21$Site <- as.factor(f_t_dat_ft19.21$Site)
+
+
+# summarize across the years
+field.d.ft <- f_t_dat_ft19.21 %>% 
+  group_by(Site) %>% 
+    mutate(phenophase = "flowertips") %>% 
+   dplyr::summarize(phenophase = phenophase, anomoly_m = mean(jul0.2_TGFT_d, na.rm = TRUE), anomoly_sd = sd(jul0.2_TGFT_d, na.rm = TRUE), temp.d.all = mean(average_minTdep_fullyr, na.rm = TRUE), zone_nam_1 = zone_nam_1) %>%
+  filter(!is.na(Site)) %>% 
+  distinct()
+
+
+# link data
+field.zone.d <- rbind(field.d.leaf, field.d.ft)
+#reorder zone levels
+field.zone.d$zone_nam_1 <- factor(field.zone.d$zone_nam_1, levels= c("Business-district", 
+                            "Residential-high",
+                           "Residential-med",
+                           "Residential-low",
+                           "Park"))
+
+# # remove the THU1 outlier (?)
+# field.zone.d <- field.zone.d %>%
+#   filter(Site != "THU1")
+
+# calc summary stats leaves
+# set variables for graph
+field.zone.d.l <- field.zone.d %>% 
+  filter(phenophase == "leafout")
+
+# calc summary stats- leaves
+mean.se.sd.summary.l <- data_summary.se(data = field.zone.d.l, varname = "anomoly_m", groupnames = "zone_nam_1")
+names(mean.se.sd.summary.l)[1] <- "levels"
+names(mean.se.sd.summary.l)[2] <- "mean"
+names(mean.se.sd.summary.l)[3] <- "se"
+names(mean.se.sd.summary.l)[4] <- "sd"
+
+mean.se.sd.summary.l <- mean.se.sd.summary.l %>% 
+  mutate(phenophase = "leafout")
+
+# calc summary stats flowers
+# set variables for graph
+# set variables for graph
+field.zone.d.f <- field.zone.d %>% 
+  filter(phenophase == "flowertips")
+
+# calc summary stats- leaves
+mean.se.sd.summary.f <- data_summary.se(data = field.zone.d.f, varname = "anomoly_m", groupnames = "zone_nam_1")
+names(mean.se.sd.summary.f)[1] <- "levels"
+names(mean.se.sd.summary.f)[2] <- "mean"
+names(mean.se.sd.summary.f)[3] <- "se"
+names(mean.se.sd.summary.f)[4] <- "sd"
+
+mean.se.sd.summary.f <- mean.se.sd.summary.f %>% 
+  mutate(phenophase = "flowertips")
+
+# combine summary stats for leaves and flowers
+
+mean.se.sd.summary.l.f <- rbind(mean.se.sd.summary.l, mean.se.sd.summary.f)
+
+mean.se.sd.summary.l.f$phenophase <- factor(mean.se.sd.summary.l.f$phenophase, levels = c("leafout", "flowertips"))
+
+# plot
+
+fill.colors <- c("orange", "lightpink" , "yellow", "springgreen", "darkgreen")
+
+p.zone.l.f <- ggplot(data = mean.se.sd.summary.l.f, aes(x= levels, y = mean, fill = levels)) +
+    scale_fill_manual(values = fill.colors, name = "Land-use zone") +
+  geom_bar(stat = "identity", color = "black", 
+  position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2,
+                 position=position_dodge(.9)) +
+  ylab( "Departure (days) ") + 
+    xlab(" ") +
+  scale_y_continuous(breaks = c(-8, -6, -4, -2, 0, 2, 4, 6)) +
+    theme_classic()+
+    theme(axis.text.x = element_blank(),  
+      axis.text.y = element_text(size = 14), 
+      axis.title.x = element_text(size = 14),  
+      axis.title.y = element_text(size = 14), 
+      legend.text = element_text(size = 14),
+      legend.title = element_text(size = 14, face = "bold")) +
+    facet_wrap(~ phenophase)
+p.zone.l.f
+
+# png("images/Field-manuscript-figs/departure-leaves-flowertips-zone-barplot-2019-2021.png")
+# p.zone.l.f
+# dev.off()
+```
+
+
+# Results text sections
+# 3.1 Intra-urban phenological variation 
+```{r intrauraban pheno variation - leaves}
+# load data
+pheno.f <- read.csv("data/field-data-2019-2021/field-data-dep-by-site-all_phenophase_by_site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# leaf open min and max variation
+# Max-Min site variation
+pheno.f %>% 
+  filter(year == "average", phenophase == "leafopen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE), total.var.sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+
+# Which site was earliest to leaf open
+pheno.f %>% 
+  filter(year == "average", phenophase == "leafopen") %>% 
+ slice(which.min(pheno_dep_l50_f20)) # 14ST earliest
+
+# what was the st deviation of that site
+pheno.f %>%
+  filter(Site == "14ST", phenophase == "leafopen") %>% 
+  summarize(site_sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+
+# which site was latest to leaf open
+pheno.f %>% 
+  filter(year == "average", phenophase == "leafopen") %>% 
+ slice(which.max(pheno_dep_l50_f20))  # THU2 latest
+
+#what is the st deviation of that site
+pheno.f %>%
+  filter(Site == "NOBO", phenophase == "leafopen") %>% 
+  summarize(site_sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+
+# what is the span in leaf opening for each year?
+# Max-Min site variation
+
+#2019
+pheno.f %>% 
+  filter(year == "2019", phenophase == "leafopen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2020
+pheno.f %>% 
+  filter(year == "2020", phenophase == "leafopen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2021
+pheno.f %>% 
+  filter(year == "2021", phenophase == "leafopen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+# budscale green min and max variation
+#2019
+pheno.f %>% 
+  filter(year == "2019", phenophase == "budgreen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2020
+pheno.f %>% 
+  filter(year == "2020", phenophase == "budgreen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2021
+pheno.f %>% 
+  filter(year == "2021", phenophase == "budgreen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+# average budscale greening difference
+pheno.f %>% 
+  filter(year == "average", phenophase == "budgreen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE), total.var.sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+
+# leaf emergence min and max variation
+#2019
+pheno.f %>% 
+  filter(year == "2019", phenophase == "leaftip") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2020
+pheno.f %>% 
+  filter(year == "2020", phenophase == "leaftip") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2021
+pheno.f %>% 
+  filter(year == "2021", phenophase == "leaftip") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+# average budscale greening difference
+pheno.f %>% 
+  filter(year == "average", phenophase == "leaftip") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE), total.var.sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+
+```
+
+```{r intrauraban pheno variation - flower emergence}
+# load data
+pheno.f <- read.csv("data/field-data-2019-2021/field-data-dep-by-site-all_phenophase_by_site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# flower emerge min and max variation
+# Max-Min site variation
+pheno.f %>% 
+  filter(year == "average", phenophase == "floweremerge") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE), total.var.sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+
+
+# Which site was earliest to flower emerge
+pheno.f %>% 
+  filter(year == "average", phenophase == "floweremerge") %>% 
+ slice(which.min(pheno_dep_l50_f20)) # 14ST earliest
+
+# what was the st deviation of that site
+pheno.f %>%
+  filter(Site == "14ST", phenophase == "floweremerge") %>% 
+  summarize(site_sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+
+# which site was latest to leaf open
+pheno.f %>% 
+  filter(year == "average", phenophase == "floweremerge") %>% 
+ slice(which.max(pheno_dep_l50_f20))  # THU2 latest
+
+#what is the st deviation of that site
+pheno.f %>%
+  filter(Site == "THU2", phenophase == "floweremerge") %>% 
+  summarize(site_sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+
+# what is the span in leaf opening for each year?
+# Max-Min site variation
+
+#2019
+pheno.f %>% 
+  filter(year == "2019", phenophase == "floweremerge") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2020
+pheno.f %>% 
+  filter(year == "2020", phenophase == "floweremerge") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2021
+pheno.f %>% 
+  filter(year == "2021", phenophase == "floweremerge") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+
+### FLower opening data
+# min and max variation
+#2019
+pheno.f %>% 
+  filter(year == "2019", phenophase == "floweropen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2020
+pheno.f %>% 
+  filter(year == "2020", phenophase == "floweropen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2021
+pheno.f %>% 
+  filter(year == "2021", phenophase == "floweropen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+# average difference
+pheno.f %>% 
+  filter(year == "average", phenophase == "floweropen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE), total.var.sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+```
+
+```{r average-annual-temp}
+# look at annual temp just from Jan - May- the forcing temperatures
+
+# load data
+bt.dat.month.dep.s <- read.csv( file = "data/2019-2021_temp_data/summaries/monthly_depart_2019-21.spatial.csv")
+
+# Jan 2019- May 2019
+t.2019 <- bt.dat.month.dep.s %>%
+  filter(year == 2019, month < 6) %>% 
+  dplyr::select(month, year, sensor_name8, mean_tempC:max_tempC) %>% 
+  summarise(meanC = mean(mean_tempC, na.rm = T), mean_sd = sd(mean_tempC, na.rm = T), minC = mean(min_tempC, na.rm = T), min_sd = sd(min_tempC, na.rm = T), maxC = mean(max_tempC, na.rm = T), max_sd = sd(max_tempC, na.rm = T)) %>% 
+  mutate(year= "2019")
+
+
+# Jan 2020 - May 2020
+t.2020 <- bt.dat.month.dep.s %>%
+  filter(year == 2020, month < 6) %>% 
+  dplyr::select(month, year, sensor_name8, mean_tempC:max_tempC) %>% 
+  summarise(meanC = mean(mean_tempC, na.rm = T), mean_sd = sd(mean_tempC, na.rm = T), minC = mean(min_tempC, na.rm = T), min_sd = sd(min_tempC, na.rm = T), maxC = mean(max_tempC, na.rm = T), max_sd = sd(max_tempC, na.rm = T)) %>% 
+  mutate(year= "2020")
+
+# Jan 2021 - May 2021
+t.2021 <- bt.dat.month.dep.s %>%
+  filter(year == 2021, month < 6) %>% 
+  dplyr::select(month, year, sensor_name8, mean_tempC:max_tempC) %>% 
+ summarise(meanC = mean(mean_tempC, na.rm = T), mean_sd = sd(mean_tempC, na.rm = T), minC = mean(min_tempC, na.rm = T), min_sd = sd(min_tempC, na.rm = T), maxC = mean(max_tempC, na.rm = T), max_sd = sd(max_tempC, na.rm = T)) %>% 
+  mutate(year= "2021")
+
+# bind table
+annual_temps <- rbind(t.2019, t.2020, t.2021)
+
+write.csv(annual_temps, "data/outputs/annual_temps/annual_temps_study_period.csv")
+
+```
+
+```{r - distance to city centers + pheno}
+#load datasets
+leaf.d <- read.csv("data/mixedmodel-datasets/leaf-mixed-model-regression-data.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+leaf.d$Site <- as.factor(leaf.d$Site)
+# make site a factor
+leaf.d$zone_nam_1 <- as.factor(leaf.d$zone_nam_1)
+
+  # min temp (all months)
+d.28.t <- lm(leaf.d.all~Dist_center_28th_m, data = leaf.d)
+summary(d.28.t)
+
+  # min temp (all months)
+d.pear.t <- lm(leaf.d.all~Dist_center_pearl_m, data = leaf.d)
+summary(d.pear.t) 
+
+# repeat for flowers
+
+#load datasets
+flower.d <- read.csv("data/mixedmodel-datasets/flower-mixed-model-regression-data.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+flower.d$Site <- as.factor(flower.d$Site)
+# make site a factor
+flower.d$zone_nam_1 <- as.factor(flower.d$zone_nam_1)
+
+  # min temp (all months)
+d.28.t <- lm(flower.d.all~Dist_center_28th_m, data = flower.d)
+summary(d.28.t)
+
+  # min temp (all months)
+d.pear.t <- lm(flower.d.all~Dist_center_pearl_m, data = flower.d)
+summary(d.pear.t) 
+
+```
+
+
+# 3.2 Abiotic and biotic predictors of tree phenology
+## 3.2.1 Intra-urban temperature relationship with phenology 
+```{r leaves-temp}
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leafout-temp-dep-2019-20-21.by-site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+f_t_dat_lo19.21$Site <- as.factor(f_t_dat_lo19.21$Site)
+
+
+# summarize across the years
+field.d <- f_t_dat_lo19.21 %>% 
+  dplyr::group_by(Site) %>% 
+   dplyr::summarize(leaf.d.all = mean(jul0.5_TGLO_d, na.rm = TRUE), temp.d.all = mean(average_minTdep_fullyr, na.rm = TRUE), zone_nam_1 = zone_nam_1) %>% 
+  distinct()
+
+
+
+# min temp (all months)
+lm.le <- lm(leaf.d.all~temp.d.all, data = field.d)
+summary(lm.le)
+coef(lm.le) # see slope. Slope is the average change in the dependent variable (leaf open) for every one unit increase in the independent variable (temp). So for every 1 degree increase in average temp departure, leaf burst is 2.4 days earlier. 
+plot(lm.le)
+
+
+
+
+```
+
+```{r flowers-temp}
+# load data
+f_t_dat_ft19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/flower-tip-temp-dep-2019-20-21.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+f_t_dat_ft19.21$Site <- as.factor(f_t_dat_ft19.21$Site)
+
+# summarize across the years
+field.d.ft <- f_t_dat_ft19.21 %>% 
+  dplyr::group_by(Site) %>% 
+   dplyr::summarize(flower.d.all = mean(jul0.2_TGFT_d, na.rm = TRUE), temp.d.all = mean(average_minTdep_fullyr, na.rm = TRUE), zone_nam_1 = zone_nam_1) %>% 
+  distinct()
+
+# min temp (all months)
+lm.fl <- lm(flower.d.all~temp.d.all, data = field.d.ft)
+summary(lm.fl)
+coef(lm.fl) #So for every 1 degree increase in average temp departure, flower burst is 4.4 days earlier. 
+
+
+
+```
+
+## 3.2.2 Impervious surface relationship with phenology
+```{r leaves-flowers-3.2.1}
+
+# leaf opening data
+
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leafout-temp-dep-2019-20-21.by-site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+imp_s.s <- read.csv("data/spatial-site-data/imp_surf.sites.csv")
+# make site a factor
+f_t_dat_lo19.21$Site <- as.factor(f_t_dat_lo19.21$Site)
+
+# summarize across the years
+field.d <- f_t_dat_lo19.21 %>% 
+  group_by(Site) %>% 
+   dplyr::summarize(leaf.d.all = mean(jul0.5_TGLO_d, na.rm = TRUE), temp.d.all = mean(average_minTdep_fullyr, na.rm = TRUE), zone_nam_1 = zone_nam_1) %>% 
+  distinct()
+
+
+# group by site and average across 2019-2021
+field.d <- f_t_dat_lo19.21 %>% 
+  group_by(Site) %>% 
+  dplyr::summarize(jul0.5_tglo = mean(jul0.5_tglo, na.rm = TRUE), jul0.5_TGLO_d_mn = mean(jul0.5_TGLO_d, na.rm = TRUE), jul0.5_TGLO_d_sd = sd(jul0.5_TGLO_d, na.rm = TRUE), average_minTdep_fullyr = mean(average_minTdep_fullyr)) 
+
+  # mutate_all(~ifelse(is.nan(.), NA, .)) %>% 
+  # mutate(Site = as.factor(Site))
+
+# merge data with impervious surface dataset
+field.d<- field.d %>% 
+  left_join(imp_s.s, by = "Site")
+
+# min temp (all months)
+lm.4l <- lm(jul0.5_TGLO_d_mn~pA250, data = field.d)
+summary(lm.4l)
+
+# 6.18.2025- looking at percentages and number of days advanced or delayed
+# leaves
+coef(lm.4l)
+
+# see slope of pA250. Slope is the average change in the dependent variable (leaf open) for every one unit increase in the independent variable (imp). So for every 1 unit increase in impervious surface, leaf burst is 11.44 days earlier. The alegebra shows for 10% increase in impervious surface cover, leaf opening is -1.144 days earlier. 
+
+plot(lm.4l)
+
+
+
+# Flower emergence data
+
+# prep flower data
+
+f_t_dat_ft19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/flower-tip-temp-dep-2019-20-21.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+f_t_dat_ft19.21$Site <- as.factor(f_t_dat_ft19.21$Site)
+
+
+# group by site and average across 2019-2021
+field.d.f <- f_t_dat_ft19.21 %>% 
+  group_by(Site) %>% 
+  dplyr::summarize(jul0.2_tgft = mean(jul0.2_tgft, na.rm = TRUE), jul0.2_TGFT_d_mn = mean(jul0.2_TGFT_d, na.rm = TRUE), jul0.2_TGFT_d_sd = sd(jul0.2_TGFT_d, na.rm = TRUE), average_minTdep_fullyr = mean(average_minTdep_fullyr)) 
+
+# merge data with impervious surface dataset
+field.d.f <- field.d.f %>% 
+  left_join(imp_s.s, by = "Site")
+
+# min temp (all months)
+lm.4 <- lm(jul0.2_TGFT_d_mn~pA250, data = field.d.f)
+summary(lm.4)
+
+
+# 6.18.2025- looking at percentages and number of days advanced or delayed
+# leaves
+coef(lm.4)
+
+# see slope of pA250. Slope is the average change in the dependent variable (leaf open) for every one unit increase in the independent variable (imp). So for every 1 unit increase in impervious surface, leaf burst is 23.52 days earlier. The alegebra shows for 10% increase in impervious surface cover, leaf opening is -2.3 days earlier. 
+
+plot(lm.4)
+
+
+```
+
+
+## 3.2.3 Land-use zones relationships with phenology
+```{r summarize-mean-min-max -sd-se-functions}
+#+++++++++++++++++++++++++
+# Function to calculate the mean and the standard deviation
+  # for each group
+#+++++++++++++++++++++++++
+# data : a data frame
+# varname : the name of a column containing the variable
+  #to be summariezed
+# groupnames : vector of column names to be used as
+  # grouping variables
+data_summary.se.min.max <- function(data, varname, groupnames){
+  calcSE <- function(x){sd(x)/sqrt(length(x))}
+  
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      max = max(x[[col]], na.rm=TRUE),
+      min = min(x[[col]], na.rm=TRUE),
+      se = calcSE(x[[col]]),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+  
+ return(data_sum)
+}
+```
+
+```{r leaf-zone-stats}
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leafout-temp-dep-2019-20-21.by-site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+f_t_dat_lo19.21$Site <- as.factor(f_t_dat_lo19.21$Site)
+
+
+# summarize across the years
+field.d <- f_t_dat_lo19.21 %>% 
+  dplyr::group_by(Site) %>% 
+   dplyr::summarize(leaf.d.all = mean(jul0.5_TGLO_d, na.rm = TRUE), temp.d.all = mean(average_minTdep_fullyr, na.rm = TRUE), zone_nam_1 = zone_nam_1) %>% 
+  distinct()
+
+
+#reorder zone levels
+field.d$zone_nam_1 <- factor(field.d$zone_nam_1, levels= c("Business-district", 
+                            "Residential-high",
+                           "Residential-med",
+                           "Residential-low",
+                           "Park"))
+
+# # remove the THU1 outlier
+# field.d.t <- field.d %>%
+#   filter(Site != "THU1")
+
+#ANOVA of departure of leaves by Zone
+aov.zone.leaf <- aov(leaf.d.all~zone_nam_1, data = field.d)
+summary(aov.zone.leaf)
+TukeyHSD(aov.zone.leaf)
+
+# look at means
+data_summary  <- data_summary.se.min.max(data = field.d, varname = "leaf.d.all", groupnames = "zone_nam_1")
+data_summary
+```
+```{r flower-zone-stats}
+# load data
+f_t_dat_ft19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/flower-tip-temp-dep-2019-20-21.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+f_t_dat_ft19.21$Site <- as.factor(f_t_dat_ft19.21$Site)
+
+# summarize across the years
+field.d.ft <- f_t_dat_ft19.21 %>% 
+  dplyr::group_by(Site) %>% 
+   dplyr::summarize(flower.d.all = mean(jul0.2_TGFT_d, na.rm = TRUE), temp.d.all = mean(average_minTdep_fullyr, na.rm = TRUE), zone_nam_1 = zone_nam_1) %>% 
+  distinct()
+
+#reorder zone levels
+field.d.ft$zone_nam_1 <- factor(field.d.ft$zone_nam_1, levels= c("Business-district", 
+                            "Residential-high",
+                           "Residential-med",
+                           "Residential-low",
+                           "Park"))
+
+
+
+# # remove the THU1 outlier
+# field.d.t <- field.d.ft %>%
+#   filter(Site != "THU1")
+
+#ANOVA of departure of leaves by Zone
+aov.zone.flower <- aov(flower.d.all~zone_nam_1, data = field.d.ft)
+summary(aov.zone.flower)
+TukeyHSD(aov.zone.flower)
+
+# look at means
+data_summary  <- data_summary.se.min.max(data = field.d.ft, varname = "flower.d.all", groupnames = "zone_nam_1")
+data_summary
+
+```
+
+
+
+## 3.2.4 Tree size and phenology
+
+leaf + temp + dbh + height
+```{r leaves-temp-treevariables}
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leafout-temp-dep-2019-20-21.by-site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# load imp surface data
+imp_s.s <- read.csv("data/spatial-site-data/imp_surf.sites.csv")
+# summarize across the years
+field.d <- f_t_dat_lo19.21 %>% 
+  group_by(Site) %>% 
+   summarize(leaf.d.all = mean(jul0.5_TGLO_d, na.rm = TRUE), temp.d.all = mean(average_minTdep_fullyr, na.rm = TRUE), zone_nam_1 = zone_nam_1) %>% 
+  distinct()
+
+# merge data
+field.d<- field.d %>% 
+  left_join(imp_s.s, by = "Site")
+
+# load site variables
+site.var <- read.csv(file = "data/site_variables/dist.city.center.csv")
+
+
+# add the ither site variables
+field.d <- field.d %>% 
+  left_join(site.var, by = "Site")
+
+# look at dbh and height singly
+fit.dbh <- lm(leaf.d.all ~ Tree_dbh, data=field.d)
+summary(fit.dbh) # show results
+fit.ht <- lm(leaf.d.all ~ Tree_height, data=field.d)
+summary(fit.ht) # show results
+```
+
+flower + temp + dbh + height
+```{r flowers-temp-treevariables}
+f_t_dat_ft19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/flower-tip-temp-dep-2019-20-21.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+f_t_dat_ft19.21$Site <- as.factor(f_t_dat_ft19.21$Site)
+
+# load imp surface data
+imp_s.s <- read.csv("data/spatial-site-data/imp_surf.sites.csv")
+
+# summarize across the years
+field.d <- f_t_dat_ft19.21 %>% 
+  group_by(Site) %>% 
+   summarize(flower.d.all = mean(jul0.2_TGFT_d, na.rm = TRUE), temp.d.all = mean(average_minTdep_fullyr, na.rm = TRUE), zone_nam_1 = zone_nam_1) %>% 
+  distinct()
+
+# merge data
+field.d<- field.d %>% 
+  left_join(imp_s.s, by = "Site")
+
+# load site variables
+site.var <- read.csv(file = "data/site_variables/dist.city.center.csv")
+
+
+# add the ither site variables
+field.d <- field.d %>% 
+  left_join(site.var, by = "Site")
+
+# look at dbh and height singly
+fit.dbh <- lm(flower.d.all ~ Tree_dbh, data=field.d)
+summary(fit.dbh) # show results
+fit.ht <- lm(flower.d.all ~ Tree_height, data=field.d)
+summary(fit.ht) # show results
+
+# Multiple Linear Regression Example
+fit2 <- lm(flower.d.all ~ temp.d.all + Tree_dbh + Tree_height, data=field.d)
+summary(fit2) # show results
+
+coefficients(fit2) # model coefficients
+confint(fit2, level=0.95) # CIs for model parameters
+fitted(fit2) # predicted values
+residuals(fit2) # residuals
+anova(fit2) # anova table
+vcov(fit2) # covariance matrix for model parameters
+layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page
+plot(fit2)
+```
+
+
+
+
+# 3.3 Temperature variation and landscape relationships
+Tally completeness of the daily temp records (in script # 42)
+## 3.3.1 Intraurban temperature departures
+```{r}
+# monthly data with spatial
+bt.dat.month.dep.s <- read.csv( file = "data/2019-2021_temp_data/summaries/monthly_depart_2019-21.spatial.csv")
+
+# annual departure temp data
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leafout-temp-dep-2019-20-21.by-site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# monthly min temps
+min(bt.dat.month.dep.s$depart_mon_min)- max(bt.dat.month.dep.s$depart_mon_min)
+
+mean(bt.dat.month.dep.s$depart_mon_min)
+sd(bt.dat.month.dep.s$depart_mon_min)
+
+# monthly max temps
+min(bt.dat.month.dep.s$depart_mon_max)- max(bt.dat.month.dep.s$depart_mon_max)
+
+mean(bt.dat.month.dep.s$depart_mon_max)
+sd(bt.dat.month.dep.s$depart_mon_max)
+
+# monthly mean temps
+min(bt.dat.month.dep.s$depart_mon_mean)- max(bt.dat.month.dep.s$depart_mon_mean)
+
+mean(bt.dat.month.dep.s$depart_mon_mean)
+sd(bt.dat.month.dep.s$depart_mon_mean)
+
+# study duration temps
+min(f_t_dat_lo19.21$average_minTdep_fullyr)
+max(f_t_dat_lo19.21$average_minTdep_fullyr)
+
+#difference
+min(f_t_dat_lo19.21$average_minTdep_fullyr)-max(f_t_dat_lo19.21$average_minTdep_fullyr)
+
+
+ 
+ 
+```
+
+## 3.3.2 Impervious surface, elevation, light, distance to city center  relationship with temperature
+```{r impervious surface levels relation temp}
+# load imp surface data
+imp_s <- read.csv(file = "data/paige_analysis/light_impervious_surf_radii_by_site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+
+lo_d <- read.csv(file = "data/outputs/combined-temp-pheno-dat/leafout-temp-dep-2019-20-21.by-site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE) #this is not opening properly 1/25/2022 but was the 
+
+temp.site <- lo_d %>% 
+  dplyr::select(average_minTdep_fullyr, Site, zone_nam_1) %>% 
+  distinct()
+
+
+# calc the mean in squared to feet, 1 meter = 3.28 feet
+imp_s.s <- imp_s %>% 
+  group_by(Site) %>% 
+  summarize( tot_500m.s = (mean(tot_500m, na.rm = TRUE)), tot_250m.s = (mean(tot_250m, na.rm = TRUE)), tot_150m.s = (mean(tot_150m, na.rm = TRUE)), tot_50m.s = (mean(tot_50m, na.rm = TRUE)), tot_25m.s = (mean(tot_25m, na.rm = TRUE)), tot_10m.s = (mean(tot_10m, na.rm = TRUE))) 
+
+# merge data
+lo_imp.d<- temp.site %>% 
+  left_join(imp_s.s, by = "Site")
+
+# calc the proportion of imp surface out of the radius in  FEET
+# add the totoal area for each radii
+lo_imp.d <- lo_imp.d %>% 
+  mutate(totA_10 = 3381.9, totA_25 = 21134.4, totA_50 = 84537.5, totA_150 = 760775.6, totA_250 = 2113437.5, totA_500 = 8453749.9) 
+
+# calc the proportion of imp surface out of the radius in  FEET
+# add the totoal area for each radii
+lo_imp.d <- lo_imp.d %>% 
+  mutate(totA_10 = 3381.9, totA_25 = 21134.4, totA_50 = 84537.5, totA_150 = 760775.6, totA_250 = 2113437.5, totA_500 = 8453749.9) 
+
+# calc the proportions
+lo_imp.d <- lo_imp.d %>% 
+  mutate(pA10 = (tot_10m.s/totA_10), pA25 = (tot_25m.s/totA_25), pA50 = (tot_50m.s/totA_50), pA150 = (tot_150m.s/totA_150), pA250 = (tot_250m.s/totA_250), pA500 = (tot_500m.s/totA_500))
+
+ # change NaN to NA so it doest mess up the calculations later on
+lo_imp.d$pA10[is.nan(lo_imp.d$pA10)]<-NA
+  # change NaN to NA so it doest mess up the calculations later on
+lo_imp.d$pA25[is.nan(lo_imp.d$pA25)]<-NA
+  # change NaN to NA so it doest mess up the calculations later on
+lo_imp.d$pA50[is.nan(lo_imp.d$pA50)]<-NA
+
+lo_imp.d$pA150 <- as.numeric(lo_imp.d$pA150)
+
+#reorder zone levels
+lo_imp.d$zone_nam_1 <- factor(lo_imp.d$zone_nam_1, levels= c("Business-district", 
+                            "Residential-high",
+                           "Residential-med",
+                           "Residential-low",
+                           "Park"))
+zone_names <- c("Business-district" = "Business-district", 
+                  "Residential-high" = "Residential-high", 
+                  "Residential-med" = "Residential-med", 
+                  "Residential-low" = "Residential-low", 
+                  "Park" = "Park")
+  
+  zone_colors <- c("Business-district" = "red", 
+                   "Residential-high" = "orange", 
+                   "Residential-med" = "yellow", 
+                   "Residential-low" = "green", 
+                   "Park" = "darkgreen")
+
+  # min temp (all months)
+lm.500 <- lm(average_minTdep_fullyr~pA500, data = lo_imp.d)
+summary(lm.500) # r squared 0.4852 - most highly correlated
+
+# min temp (all months)
+lm.250 <- lm(average_minTdep_fullyr~pA250, data = lo_imp.d)
+summary(lm.250) # r squared 0.501 - highly correlated
+
+# min temp (all months)
+lm.i <- lm(average_minTdep_fullyr~pA150, data = lo_imp.d)
+summary(lm.i) # r squared 0.489, highly correlated
+
+# min temp (all months)
+lm.50 <- lm(average_minTdep_fullyr~pA50, data = lo_imp.d)
+summary(lm.50) # r squared 0.414, highly correlated
+
+# min temp (all months)
+lm.25 <- lm(average_minTdep_fullyr~pA25, data = lo_imp.d)
+summary(lm.25) # r squared 0.336
+
+# min temp (all months)
+lm.10 <- lm(average_minTdep_fullyr~pA10, data = lo_imp.d)
+summary(lm.10) # r squared 0.283
+
+```
+
+```{r elevation prediction of temp}
+#load datasets
+leaf.d <- read.csv("data/mixedmodel-datasets/leaf-mixed-model-regression-data.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+leaf.d$Site <- as.factor(leaf.d$Site)
+# make site a factor
+leaf.d$zone_nam_1 <- as.factor(leaf.d$zone_nam_1)
+
+  # min temp (all months)
+elev.t <- lm(temp.d.all~Elevation, data = leaf.d)
+summary(elev.t) 
+```
+
+```{r light prediction of temp}
+#load datasets
+leaf.d <- read.csv("data/mixedmodel-datasets/leaf-mixed-model-regression-data.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+leaf.d$Site <- as.factor(leaf.d$Site)
+# make site a factor
+leaf.d$zone_nam_1 <- as.factor(leaf.d$zone_nam_1)
+
+  # min temp (all months)
+light.t <- lm(temp.d.all~rel_light_site, data = leaf.d)
+summary(light.t) # r squared 0.4852 - most highly correlated
+```
+
+```{r distance to city centers and temp}
+#load datasets
+leaf.d <- read.csv("data/mixedmodel-datasets/leaf-mixed-model-regression-data.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+leaf.d$Site <- as.factor(leaf.d$Site)
+# make site a factor
+leaf.d$zone_nam_1 <- as.factor(leaf.d$zone_nam_1)
+
+  # min temp (all months)
+d.28.t <- lm(temp.d.all~Dist_center_28th_m, data = leaf.d)
+summary(d.28.t)
+
+  # min temp (all months)
+d.pear.t <- lm(temp.d.all~Dist_center_pearl_m, data = leaf.d)
+summary(d.pear.t) 
+```
+
+```{r multiple regression model}
+#load datasets
+leaf.d <- read.csv("data/mixedmodel-datasets/leaf-mixed-model-regression-data.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+leaf.d$Site <- as.factor(leaf.d$Site)
+# make site a factor
+leaf.d$zone_nam_1 <- as.factor(leaf.d$zone_nam_1)
+
+
+# Multiple Linear Regression + BOTH city center variable + no Zone
+fit3 <- lm(temp.d.all ~ pA250 + Dist_center_28th_m + Elevation + rel_light_site + Dist_center_pearl_m, data=leaf.d)
+summary(fit3) # show results
+
+# Adjusted R-squared:  0.5321  
+
+coefficients(fit3) # model coefficients
+confint(fit3, level=0.95) # CIs for model parameters
+fitted(fit3) # predicted values
+residuals(fit3) # residuals
+anova(fit3) # anova table
+vcov(fit3) # covariance matrix for model parameters
+layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page
+plot(fit3)
+
+# Multiple Linear Regression + just the sig light and pear CC
+fit3 <- lm(temp.d.all ~ pA250 + rel_light_site + Dist_center_pearl_m, data=leaf.d)
+summary(fit3) # show results
+```
+
+
+## 3.3.3 Land cover relationship with temperature
+
+```{r summarize -sd-se-functions}
+#+++++++++++++++++++++++++
+# Function to calculate the mean and the standard deviation
+  # for each group
+#+++++++++++++++++++++++++
+# data : a data frame
+# varname : the name of a column containing the variable
+  #to be summariezed
+# groupnames : vector of column names to be used as
+  # grouping variables
+data_summary.se <- function(data, varname, groupnames){
+  calcSE <- function(x){sd(x)/sqrt(length(x))}
+  
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      se = calcSE(x[[col]]),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+  
+ return(data_sum)
+}
+```
+
+```{r -barplot function}
+pre.post_barplot.se <- function(dataset, question, grouping.col ) {
+  
+  #### function to create a bar plot with errors bars shaowing the standard deviation (spread of data)
+  # dataset is a dataframe that needs to have a grouping column ( ex: in prepost data this is type with levels pre and post)
+  # question should be the column name for a particular questions, in quotes
+  # grouping.col should be the column with the 2 levels, in quotes
+  # returns a bar plot of pre/post data
+  
+mean.se.sd.summary <- data_summary.se(data = dataset, varname = question, groupnames = grouping.col)
+names(mean.se.sd.summary)[1] <- "levels"
+names(mean.se.sd.summary)[2] <- "mean"
+names(mean.se.sd.summary)[3] <- "se"
+names(mean.se.sd.summary)[4] <- "sd"
+
+fill.colors <- c("red", "orange", "yellow", "springgreen", "darkgreen")
+
+  p.1 <- ggplot(data = mean.se.sd.summary, aes(x= levels, y = mean, fill = levels)) +
+    scale_fill_manual(values = fill.colors) +
+  geom_bar(stat = "identity", color = "black", 
+  position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2,
+                 position=position_dodge(.9)) +
+  ylab(question) + 
+    theme_classic()+
+    theme(axis.text.x = element_blank())
+  return(p.1)
+}
+
+
+```
+
+```{r load dataset}
+# load imp surface data
+imp_s <- read.csv(file = "data/paige_analysis/light_impervious_surf_radii_by_site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+
+lo_d <- read.csv(file = "data/outputs/combined-temp-pheno-dat/leafout-temp-dep-2019-20-21.by-site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE) #this is not opening properly 1/25/2022 but was the 
+
+temp.site <- lo_d %>% 
+  dplyr::select(average_minTdep_fullyr, Site, zone_nam_1) %>% 
+  distinct()
+
+
+# calc the mean in squared to feet, 1 meter = 3.28 feet
+imp_s.s <- imp_s %>% 
+  group_by(Site) %>% 
+  summarize( tot_500m.s = (mean(tot_500m, na.rm = TRUE)), tot_250m.s = (mean(tot_250m, na.rm = TRUE)), tot_150m.s = (mean(tot_150m, na.rm = TRUE)), tot_50m.s = (mean(tot_50m, na.rm = TRUE)), tot_25m.s = (mean(tot_25m, na.rm = TRUE)), tot_10m.s = (mean(tot_10m, na.rm = TRUE))) 
+
+# merge data
+lo_imp.d<- temp.site %>% 
+  left_join(imp_s.s, by = "Site")
+
+# calc the proportion of imp surface out of the radius in  FEET
+# add the totoal area for each radii
+lo_imp.d <- lo_imp.d %>% 
+  mutate(totA_10 = 3381.9, totA_25 = 21134.4, totA_50 = 84537.5, totA_150 = 760775.6, totA_250 = 2113437.5, totA_500 = 8453749.9) 
+
+# calc the proportion of imp surface out of the radius in  FEET
+# add the totoal area for each radii
+lo_imp.d <- lo_imp.d %>% 
+  mutate(totA_10 = 3381.9, totA_25 = 21134.4, totA_50 = 84537.5, totA_150 = 760775.6, totA_250 = 2113437.5, totA_500 = 8453749.9) 
+
+# calc the proportions
+lo_imp.d <- lo_imp.d %>% 
+  mutate(pA10 = (tot_10m.s/totA_10), pA25 = (tot_25m.s/totA_25), pA50 = (tot_50m.s/totA_50), pA150 = (tot_150m.s/totA_150), pA250 = (tot_250m.s/totA_250), pA500 = (tot_500m.s/totA_500))
+
+ # change NaN to NA so it doest mess up the calculations later on
+lo_imp.d$pA10[is.nan(lo_imp.d$pA10)]<-NA
+  # change NaN to NA so it doest mess up the calculations later on
+lo_imp.d$pA25[is.nan(lo_imp.d$pA25)]<-NA
+  # change NaN to NA so it doest mess up the calculations later on
+lo_imp.d$pA50[is.nan(lo_imp.d$pA50)]<-NA
+
+lo_imp.d$pA150 <- as.numeric(lo_imp.d$pA150)
+
+#reorder zone levels
+lo_imp.d$zone_nam_1 <- factor(lo_imp.d$zone_nam_1, levels= c("Business-district", 
+                            "Residential-high",
+                           "Residential-med",
+                           "Residential-low",
+                           "Park"))
+zone_names <- c("Business-district" = "Business-district", 
+                  "Residential-high" = "Residential-high", 
+                  "Residential-med" = "Residential-med", 
+                  "Residential-low" = "Residential-low", 
+                  "Park" = "Park")
+  
+  zone_colors <- c("Business-district" = "red", 
+                   "Residential-high" = "orange", 
+                   "Residential-med" = "yellow", 
+                   "Residential-low" = "green", 
+                   "Park" = "darkgreen")
+
+```
+
+Zone comparison with imp surface
+```{r}
+#reorder zone levels
+lo_imp.d$zone_nam_1 <- factor(lo_imp.d$zone_nam_1, levels= c("Business-district", 
+                            "Residential-high",
+                           "Residential-med",
+                           "Residential-low",
+                           "Park"))
+
+#ANOVA of imp surf by Zone
+aov.zone.imp <- aov(pA250~zone_nam_1, data = lo_imp.d)
+summary(aov.zone.imp)
+TukeyHSD(aov.zone.imp)
+
+# test function with renamed vars
+dataset = lo_imp.d
+question = "pA250"
+grouping.col = "zone_nam_1"
+
+p.zone.imp <- pre.post_barplot.se(dataset = dataset, question = question, grouping.col = grouping.col)
+p.zone.imp
+
+# look at means
+mean.se.sd.summary <- data_summary.se(data = lo_imp.d, varname = "pA250", groupnames = "zone_nam_1")
+
+mean.se.sd.summary
+
+```
+Zone comparison with Temp
+```{r}
+# reorder zones
+lo_imp.d$zone_nam_1 <- factor(lo_imp.d$zone_nam_1, levels= c("Business-district", 
+                            "Residential-high",
+                           "Residential-med",
+                           "Residential-low",
+                           "Park"))
+
+
+#ANOVA of temp by Zone
+aov.zone.temp <- aov(average_minTdep_fullyr~zone_nam_1, data = lo_imp.d)
+summary(aov.zone.temp)
+TukeyHSD(aov.zone.temp)
+
+# test function with renamed vars
+dataset = lo_imp.d
+question = "average_minTdep_fullyr"
+grouping.col = "zone_nam_1"
+
+p.zone.temp <- pre.post_barplot.se(dataset = lo_imp.d, question = "average_minTdep_fullyr", grouping.col = "zone_nam_1")
+p.zone.temp
+
+mean.se.sd.summary <- data_summary.se(data = lo_imp.d, varname = "average_minTdep_fullyr", groupnames = "zone_nam_1")
+
+mean.se.sd.summary
+```
+
+
+
+
+# Appendix
+## Appendix A : Supplementary materials
+# SM 1. Identification of 'Spring Snow' clones 
+- in text
+# SM 2. Map of sites
+```{r tree survey years map}
+# see if can load this pre-processed dataset from script 20
+boulder_outline <- readOGR("/Users/deidrejaeger/Documents/Career/CU-Boulder/Research/spring-snow-phenology/spatial_data/BoulderCityLimits/BoulderCityLimits.shp")
+
+df <- read.csv("data/spatial-site-data/spatial_sites.csv")
+# create a single set of trees, without the 2019 only trees, and add a site number
+df0 <- df %>% 
+  select(Site) %>% 
+  unique() %>% 
+  filter(Site != "WOND", Site != "SUMA",Site != "UNIO",Site != "BAS1") %>% 
+  mutate(site_number = seq(1:40))
+
+# join the df and df0
+df <- df %>% 
+  left_join(df0, by = "Site")
+
+# define color schemes
+year_label <- c("2019-2020" = "2019-2021", "2020" = "2020-2021")
+year_color <- c( "2019-2020" = "purple","2020" = "red")
+
+
+# # plot
+# df %>% 
+#   filter(second.tre == 1, year_visit != 2019) %>%
+#   ggplot(aes(x=coords.x1, y=coords.x2, color = year_visit), shape = second.tre) +  
+#     geom_polygon(data=boulder_outline, aes(x=long, y=lat, group=group),
+#                fill=NA,color="grey", size=1) +
+#   geom_point(size = 2) +
+#    geom_label_repel(aes(label = site_number),
+#                   size          = 2,
+#                   box.padding   = 0.005,
+#                   label.padding = 0.1,
+#                   point.padding = 0.1,
+#                   force         = 35,
+#                   segment.size  = 0.5,
+#                   segment.color = "grey50", 
+#                   direction = c("both", "y", "x"), 
+#                   min.segment.length = 0.01, 
+#                   max.overlaps = 15) +
+# scale_color_manual(name = "survey-year",
+#                      labels = year_label,
+#                      values = year_color) +
+#    scale_shape_manual(name = "Number of trees per site", 
+#                       labels = year_label,
+#                       values = c(1 = 19,
+#                                  2 = 19)) +
+#   annotation_scale() +
+#   coord_equal() +
+#   theme_map() +
+#   theme(legend.position="right") +
+#   # theme(legend.key.width=unit(3, "cm") +
+#   guides(color = guide_legend(override.aes=list(shape = 19)))
+
+
+df.plot <- df %>% 
+  filter(year_visit != 2019)
+
+df.labels <- df.plot %>% 
+  filter(second.tre != 2)
+  
+p <- 
+  ggplot(data = df.plot, aes(x=coords.x1, y=coords.x2)) +  
+    geom_polygon(data=boulder_outline, aes(x=long, y=lat, group=group),
+               fill=NA,color="grey", size=1) +
+  geom_point(data = df.plot, aes(x=coords.x1, y=coords.x2, color = year_visit,shape = factor(second.tre)), size = 2) +
+   geom_label_repel(data = df.labels, aes(label = site_number),
+                  size          = 2,
+                  box.padding   = 0.005,
+                  label.padding = 0.1,
+                  point.padding = 0.1,
+                  force         = 35,
+                  segment.size  = 0.5,
+                  segment.color = "grey50", 
+                  direction = c("both", "y", "x"), 
+                  min.segment.length = 0.01, 
+                  max.overlaps = 15) +
+scale_color_manual(name = "Years of survey",
+                     labels = year_label,
+                     values = year_color) +
+   scale_shape_manual(name = "Number of trees per site", 
+                      labels = c("1"="1 tree", "2" = "2 trees"),
+                      values = c("1" = 19,
+                                 "2" = 3)) +
+  # annotation_scale() + # this doesn't seem right compared to other plots where 5 km is nearly the whole width of the city
+  coord_equal() +
+  theme_map() +
+  theme(legend.position="right") 
+# theme(legend.key.width=unit(3, "cm")
+p
+```
+# SM 3. Phenological growth stages
+- text in doc
+# SM 4. Temperature records by site
+- table provided in doc
+# SM 5. Land-use Zones
+- table provided in doc
+# SM 6.  Methods for estimating relative light
+- text in doc
+# SM 7. Phenological departure methods and results
+- 7a text in doc
+# Sm 7b. Budburst variation for all phenophases
+```{r}
+# load data
+pheno.f <- read.csv("data/field-data-2019-2021/field-data-dep-by-site-all_phenophase_by_site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# plot the variation across sites over all three years and the average
+p.all <- ggboxplot(pheno.f, x = "phenophase", y = "pheno_dep_l50_f20", width = 0.1,  ylab = "departure from mean (days)", xlab =  "Phenophase", color = "phenophase") +
+ facet_grid(cols = vars(year)) +
+ scale_y_continuous(breaks=seq(-20,40,5)) +
+  geom_hline(yintercept=0,linetype=2) +
+  theme(axis.text.x = element_text(angle = 45,  hjust=1, size = 12))
+p.all
+
+png("images/Field-manuscript-figs/intraurban-variation-field-budburst-boxplt-Appendix4.png")
+p.all
+dev.off()
+
+```
+
+# SM 8. Tree age and size results
+
+```{r load-impervious-layer}
+boulder_imp_surf <- readOGR("/Users/deidrejaeger/Documents/Career/CU-Boulder/Research/spring-snow-phenology/Impervious/")
+
+extent(boulder_imp_surf)
+crs(boulder_imp_surf) # crs is not projected because +proj is in latlong
+# plot(boulder_imp_surf, 
+#      lty = 0.25)
+```
+
+```{r load-outline-boulder}
+boulder_outline <- readOGR("/Users/deidrejaeger/Documents/Career/CU-Boulder/Research/spring-snow-phenology/spatial_data/BoulderCityLimits/BoulderCityLimits.shp")
+
+```
+
+```{r tree size differences}
+
+# see if can load this pre-processed dataset from script 20
+df<- read.csv("data/spatial-site-data/spatial_sites.csv")
+
+# change the tree size variables to numeric
+df$trunk_diam <- as.numeric(paste(df$trunk_diam))
+df$trunk_di_1 <- as.numeric(paste(df$trunk_di_1))
+df$tree_heigh <- as.numeric(paste(df$tree_heigh))
+df$dripline_m <- as.numeric(paste(df$dripline_m))
+
+# convert trunk diameter to cm 
+df <- df %>% 
+  mutate(trunk_dia1_cm = trunk_di_1*2.54)
+
+# ( could add the diameter from bas2, wond, union, suma)
+
+hist(df$trunk_diam)
+hist(df$trunk_dia1_cm)
+hist(df$tree_heigh)
+hist(df$dripline_m)
+
+
+df %>% 
+  ggplot() +
+  geom_point(aes(x=coords.x1, y=coords.x2, color = tree_heigh, size = trunk_dia1_cm), shape = 1) +
+  scale_color_gradient(name = "Tree height (m)", # 2 color gradient, for 3, use scale_color_gradient2
+                   low = "springgreen", high = "black", 
+                   limits = c(1,8), 
+                      breaks = c(2, 4, 6, 8), 
+                     labels = c("2", "4", "6", "8"))  +
+   scale_size_continuous(breaks = c(5, 10, 15, 20, 40),
+                   labels = c(5, 10, 15, 20, 40),
+                   limits = c(5,44),
+                     name = "Trunk diameter (cm)") +
+  geom_polygon(data=boulder_outline, aes(x=long, y=lat, group=group),
+               fill=NA,color="gray", size=0.5) +
+
+  coord_equal() +
+  theme_map() +
+  theme(legend.position="right") +
+  theme(legend.key.width=unit(3, "cm")) +
+  ggtitle(" ")
+
+```
+
+
+# SM 9. Temperature variation results
+
+```{r}
+# monthly data with spatial
+bt.dat.month.dep.s <- read.csv( file = "data/2019-2021_temp_data/summaries/monthly_depart_2019-21.spatial.csv")
+
+ ####### make the figure for all sites
+ #create a min dataset
+all.min <- bt.dat.month.dep.s %>%
+  dplyr::select(month, year, sensor_name8, depart_mon_min) %>% 
+  mutate(departure_value = depart_mon_min, departure_type= "depart_mon_min") %>% 
+  dplyr::select(-depart_mon_min)
+
+#create a max dataset
+all.max <- bt.dat.month.dep.s %>%
+  dplyr::select(month, year, sensor_name8, depart_mon_max) %>% 
+  mutate(departure_value = depart_mon_max, departure_type= "depart_mon_max") %>% 
+  dplyr::select(-depart_mon_max)
+
+#create a mean dataset
+all.mean <- bt.dat.month.dep.s %>%
+  dplyr::select(month, year, sensor_name8, depart_mon_mean) %>% 
+  mutate(departure_value = depart_mon_mean, departure_type= "depart_mon_mean") %>% 
+  dplyr::select(-depart_mon_mean)
+
+# fuse datasets
+
+all.1 <- rbind(all.min,all.max, all.mean)
+
+# drop the double tree entries
+all.1 <- all.1 %>% 
+  unique() # there is double values for the two trees (drop the columns of SStree tag, coord1, coords2)
+
+# change sensor name to a factor
+all.1$sensor_name8 <- as.factor(all.1$sensor_name8)
+# boxplot for all sites in 3 total plots
+t.1 <- ggplot(data= all.1, aes(x = departure_type, y = departure_value, color = departure_type)) +
+   geom_boxplot(width= 0.5) +
+   xlab(" ") +
+  ylab("monthly temperature departures °C") +
+  scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9")) +
+ scale_y_continuous(breaks=seq(-3,5,1)) +
+   coord_cartesian(ylim = c(-3, 5)) +
+   geom_hline(yintercept=0, linetype="dashed", 
+                color = "red", size=1) +
+   theme_classic()+
+  theme(axis.text.x = element_text(angle = 45,  hjust=1, size = 12)) 
+
+png("images/Field-manuscript-figs/min-max-mean-temp-appendix8.png")
+t.1
+dev.off()
+#  # create a box plot of the temperature departures by site, each site has a boxplot for min/max/max
+# 
+# #Try to create goal boxplot with one site
+# valm <- bt.dat.month.dep.s %>% 
+#   filter(Site == "VALM")
+# 
+# #create a min dataset
+# valm.min <- valm %>%
+#   dplyr::select(month, year, sensor_name8, depart_mon_min) %>% 
+#   mutate(departure_value = depart_mon_min, departure_type= "depart_mon_min") %>% 
+#   dplyr::select(-depart_mon_min)
+# 
+# #create a max dataset
+# valm.max <- valm %>%
+#   dplyr::select(month, year, sensor_name8, depart_mon_max) %>% 
+#   mutate(departure_value = depart_mon_max, departure_type= "depart_mon_max") %>% 
+#   dplyr::select(-depart_mon_max)
+# 
+# #create a mean dataset
+# valm.mean <- valm %>%
+#   dplyr::select(month, year, sensor_name8, depart_mon_mean) %>% 
+#   mutate(departure_value = depart_mon_mean, departure_type= "depart_mon_mean") %>% 
+#   dplyr::select(-depart_mon_mean)
+# 
+# # fuse datasets
+# 
+# valm.1 <- rbind(valm.min,valm.max, valm.mean)
+# 
+# # drop the double tree entries
+# valm.1 <- valm.1 %>% 
+#   unique() # there is double values for the two trees (drop the columns of SStree tag, coord1, coords2)
+# 
+# # change sensor name to a factor
+# valm.1$sensor_name8 <- as.factor(valm.1$sensor_name8)
+# 
+# # boxplot for the single site
+#  ggplot(data= valm.1, aes(x = sensor_name8, y = departure_value, color = departure_type)) +
+#    geom_boxplot(width= 0.5) +
+#    xlab("Site") +
+#   ylab("monthly temperature departures °C") +
+#   scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9")) +
+#  # scale_y_continuous(breaks=seq(-3,3,1)) +
+#  #   coord_cartesian(ylim = c(-5, 5)) +
+#    geom_hline(yintercept=0, linetype="dashed", 
+#                 color = "red", size=1) +
+#    theme_classic()+
+#   theme(axis.text.x = element_text(angle = 45,  hjust=1, size = 12)) 
+# 
+# 
+# # boxplot for all sites
+#  ggplot(data= all.1, aes(x = sensor_name8, y = departure_value, color = departure_type)) +
+#    geom_boxplot(width= 0.5) +
+#    xlab("Site") +
+#   ylab("monthly temperature departures °C") +
+#   scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9")) +
+#  # scale_y_continuous(breaks=seq(-3,3,1)) +
+#  #   coord_cartesian(ylim = c(-5, 5)) +
+#    geom_hline(yintercept=0, linetype="dashed", 
+#                 color = "red", size=1) +
+#    theme_classic()+
+#   theme(axis.text.x = element_text(angle = 45,  hjust=1, size = 12)) 
+```
+
+# SM 10. Impervious surface radii results colored by land use
+```{r load-data}
+lo_imp.d <- read.csv( "data/site-data/impervious_surface_radii.csv")
+
+#reorder zone levels
+lo_imp.d$zone_nam_1 <- factor(lo_imp.d$zone_nam_1, levels= c("Business-district", 
+                            "Residential-high",
+                           "Residential-med",
+                           "Residential-low",
+                           "Park"))
+zone_names <- c("Business-district" = "Business-district", 
+                  "Residential-high" = "Residential-high", 
+                  "Residential-med" = "Residential-med", 
+                  "Residential-low" = "Residential-low", 
+                  "Park" = "Park")
+  
+  zone_colors <- c("Business-district" = "orange", 
+                   "Residential-high" = "pink", 
+                   "Residential-med" = "yellow", 
+                   "Residential-low" = "green", 
+                   "Park" = "darkgreen")
+
+```
+
+create each panel for radii 500, 250, 150, 50, 25, 10m
+```{r panels}
+
+# min temp (all months)
+lm.500 <- lm(average_minTdep_fullyr~pA500, data = lo_imp.d)
+summary(lm.500) # r squared 0.4852 - most highly correlated
+
+
+# Regression intervals:
+# create a dataframe to store predictions of the budburst date
+newd.4 <- data.frame(pA500 = rep(seq(min(lo_imp.d$pA500), max(lo_imp.d$pA500), length.out=100),1))
+# store predictions from lm model
+preds <- predict(lm.500,newdata=newd.4,se.fit=TRUE)
+mnlp <- preds$fit        #mean of the linear predictor
+selp <- preds$se.fit     #se of the linear predictor
+cillp <- mnlp - 2 * selp #lower of 95% CI for linear predictor
+ciulp <- mnlp + 2 * selp #upper
+
+# gather predictions into a data frame, 
+preds <- cbind(newd.4,preds,cillp,ciulp,mnlp)
+
+
+
+# plot the regression no lines
+p.500.a <- ggplot() +
+    geom_point(mapping=aes(x=pA500,y=average_minTdep_fullyr, color = zone_nam_1), size = 3, data=lo_imp.d) +
+   geom_text_repel() +
+  annotate(
+    "text", label = bquote(paste("500 m radius, p < 0.001, ", R^{"2"}, "= 0.49")),
+    x = 0.45, y =2.4, size = 3.7, colour = "black"
+  ) +
+      scale_color_manual(labels = zone_names, values = zone_colors, name = "500m" ) +
+  geom_ribbon(mapping=aes(x=pA500,ymin=cillp,ymax=ciulp),
+                alpha=0.2,color = "gray", fill = "gray", data=preds) +
+    geom_line(mapping=aes(x=pA500,y=mnlp), color = "black", data=preds) +
+ylab("Temperature departure (°C)") +
+  # xlab("proportion of impervious surface (500 m radius)") +
+  xlab(" ") +
+    theme(legend.position = "none") +
+  guides(color = FALSE) +
+  theme_classic()
+p.500.a
+
+# min temp (all months)
+lm.250 <- lm(average_minTdep_fullyr~pA250, data = lo_imp.d)
+summary(lm.250) # r squared 0.501 - highly correlated
+
+
+# Regression intervals:
+# create a dataframe to store predictions of the budburst date
+newd.4 <- data.frame(pA250 = rep(seq(min(lo_imp.d$pA250), max(lo_imp.d$pA250), length.out=100),1))
+# store predictions from lm model
+preds <- predict(lm.250,newdata=newd.4,se.fit=TRUE)
+mnlp <- preds$fit        #mean of the linear predictor
+selp <- preds$se.fit     #se of the linear predictor
+cillp <- mnlp - 2 * selp #lower of 95% CI for linear predictor
+ciulp <- mnlp + 2 * selp #upper
+
+# gather predictions into a data frame, 
+preds <- cbind(newd.4,preds,cillp,ciulp,mnlp)
+
+
+
+# plot the regression no lines
+p.250.a <- ggplot() +
+    geom_point(mapping=aes(x=pA250,y=average_minTdep_fullyr, color = zone_nam_1), size = 3, data=lo_imp.d) +
+   geom_text_repel() +
+  annotate(
+    "text", label = bquote(paste("250 m radius, p < 0.001, ", R^{"2"}, "= 0.50")),
+    x = 0.45, y =2.4, size = 3.7, colour = "black"
+  ) +
+      scale_color_manual(labels = zone_names, values = zone_colors, name = "250m" ) +
+  geom_ribbon(mapping=aes(x=pA250,ymin=cillp,ymax=ciulp),
+                alpha=0.2,color = "gray", fill = "gray", data=preds) +
+    geom_line(mapping=aes(x=pA250,y=mnlp), color = "black", data=preds) +
+ 
+  #  ylab("Departure from average site min \n temperature (°C) 2019-2021") +
+  # xlab("proportion of impervious surface (250 m radius)") +
+      ylab(" ") +
+  xlab(" ") +
+    theme(legend.position = "none") +
+  guides(color = FALSE) +
+  theme_classic()
+p.250.a
+
+# min temp (all months)
+lm.i <- lm(average_minTdep_fullyr~pA150, data = lo_imp.d)
+summary(lm.i) # r squared 0.489, highly correlated
+
+
+# Regression intervals:
+# create a dataframe to store predictions of the budburst date
+newd.4 <- data.frame(pA150 = rep(seq(min(lo_imp.d$pA150), max(lo_imp.d$pA150), length.out=100),1))
+# store predictions from lm model
+preds <- predict(lm.i,newdata=newd.4,se.fit=TRUE)
+mnlp <- preds$fit        #mean of the linear predictor
+selp <- preds$se.fit     #se of the linear predictor
+cillp <- mnlp - 2 * selp #lower of 95% CI for linear predictor
+ciulp <- mnlp + 2 * selp #upper
+
+# gather predictions into a data frame, 
+preds <- cbind(newd.4,preds,cillp,ciulp,mnlp)
+
+
+# plot the regression no lines
+p.150.a <- ggplot() +
+    
+    geom_point(mapping=aes(x=pA150,y=average_minTdep_fullyr, color = zone_nam_1), size = 3, data=lo_imp.d) +
+   geom_text_repel() +
+  annotate(
+    "text", label = bquote(paste("150 m radius, p < 0.001, ", R^{"2"}, "= 0.49")),
+    x = 0.45, y =2.4, size = 3.7, colour = "black"
+  ) +
+    scale_color_manual(labels = zone_names, values = zone_colors, name = "150m" ) +
+  geom_ribbon(mapping=aes(x=pA150,ymin=cillp,ymax=ciulp),
+                alpha=0.2,color = "gray", fill = "gray", data=preds) +
+   geom_line(mapping=aes(x=pA150,y=mnlp), color = "black", data=preds) +
+
+      ylab("Temperature departure (°C)") +
+  xlab(" ") +
+    theme(legend.position = "none") +
+  guides(color = FALSE) +
+  theme_classic()
+p.150.a
+
+
+# min temp (all months)
+lm.50 <- lm(average_minTdep_fullyr~pA50, data = lo_imp.d)
+summary(lm.50) # r squared 0.414, highly correlated
+
+
+# Regression intervals:
+# create a dataframe to store predictions of the budburst date
+newd.4 <- data.frame(pA50 = rep(seq(min(lo_imp.d$pA50), max(lo_imp.d$pA50), length.out=100),1))
+# store predictions from lm model
+preds <- predict(lm.50,newdata=newd.4,se.fit=TRUE)
+mnlp <- preds$fit        #mean of the linear predictor
+selp <- preds$se.fit     #se of the linear predictor
+cillp <- mnlp - 2 * selp #lower of 95% CI for linear predictor
+ciulp <- mnlp + 2 * selp #upper
+
+# gather predictions into a data frame, 
+preds <- cbind(newd.4,preds,cillp,ciulp,mnlp)
+
+
+# plot the regression no lines
+p.50.a <- ggplot() +
+    
+    geom_point(mapping=aes(x=pA50,y=average_minTdep_fullyr, color = zone_nam_1), size = 3, data=lo_imp.d) +
+   geom_text_repel() +
+  annotate(
+    "text", label = bquote(paste("50 m radius, p < 0.001, ", R^{"2"}, "= 0.41")),
+    x = 0.45, y =2.4, size = 3.7, colour = "black"
+  ) +
+      scale_color_manual(labels = zone_names, values = zone_colors, name = "50m" ) +
+  geom_ribbon(mapping=aes(x=pA50,ymin=cillp,ymax=ciulp),
+                alpha=0.2,color = "gray", fill = "gray", data=preds) +
+    # xlim(c(-2,3)) +
+  # scale_y_continuous(breaks=seq(-15, 15, by = 5)) +
+  #  scale_fill_gradient(low="darkgreen", high ="white", name = " Proportion of  \n impervious surface  \n at 150 m radius", limits= c(min(lo_imp.d$pA150, na.rm= T), max(lo_imp.d$pA150, na.rm = T))) +
+   geom_line(mapping=aes(x=pA50,y=mnlp), color = "black", data=preds) +
+  # geom_hline(yintercept = 0, color = "blue", linetype = "dotted", size = 2) + 
+  #   geom_vline(xintercept = 0, color = "blue", linetype = "dotted", size = 2) + 
+  #  ylab("Departure from average site min \n temperature (°C) 2019-2021") +
+  # xlab("proportion of impervious surface (50 m radius)") +
+      ylab(" ") +
+  xlab(" ") +
+    theme(legend.position = "none") +
+  guides(color = FALSE) +
+  theme_classic()
+
+p.50.a
+
+# note, this is looking all sites across
+
+## 25 m
+
+# min temp (all months)
+lm.25 <- lm(average_minTdep_fullyr~pA25, data = lo_imp.d)
+summary(lm.25) # r squared 0.336
+
+
+# Regression intervals:
+# create a dataframe to store predictions of the budburst date
+newd.4 <- data.frame(pA25 = rep(seq(min(lo_imp.d$pA25), max(lo_imp.d$pA25), length.out=100),1))
+# store predictions from lm model
+preds <- predict(lm.25,newdata=newd.4,se.fit=TRUE)
+mnlp <- preds$fit        #mean of the linear predictor
+selp <- preds$se.fit     #se of the linear predictor
+cillp <- mnlp - 2 * selp #lower of 95% CI for linear predictor
+ciulp <- mnlp + 2 * selp #upper
+
+# gather predictions into a data frame, 
+preds <- cbind(newd.4,preds,cillp,ciulp,mnlp)
+
+
+# plot the regression no lines
+p.25.a <- ggplot() +
+    
+    geom_point(mapping=aes(x=pA25,y=average_minTdep_fullyr, color = zone_nam_1), size = 3, data=lo_imp.d) +
+   geom_text_repel() +
+  annotate(
+    "text", label = bquote(paste("25 m radius, p < 0.001, ", R^{"2"}, "= 0.37")),
+    x = 0.45, y =2.4, size = 3.7, colour = "black"
+  ) +
+  geom_ribbon(mapping=aes(x=pA25,ymin=cillp,ymax=ciulp),
+                alpha=0.2,color = "gray", fill = "gray", data=preds) +
+      scale_color_manual(labels = zone_names, values = zone_colors, name = "25m" ) +
+    # xlim(c(-2,3)) +
+  # scale_y_continuous(breaks=seq(-15, 15, by = 5)) +
+  #  scale_fill_gradient(low="darkgreen", high ="white", name = " Proportion of  \n impervious surface  \n at 125 m radius", limits= c(min(lo_imp.d$pA125, na.rm= T), max(lo_imp.d$pA125, na.rm = T))) +
+   geom_line(mapping=aes(x=pA25,y=mnlp), color = "black", data=preds) +
+  # geom_hline(yintercept = 0, color = "blue", linetype = "dotted", size = 2) + 
+  #   geom_vline(xintercept = 0, color = "blue", linetype = "dotted", size = 2) + 
+ylab("Temperature departure (°C)") +
+  xlab("Proportion of impervious surface") +
+    theme(legend.position = "none") +
+  guides(color = FALSE) +
+  theme_classic()
+p.25.a
+
+
+## 10 m
+
+# min temp (all months)
+lm.10 <- lm(average_minTdep_fullyr~pA10, data = lo_imp.d)
+summary(lm.10) # r squared 0.283
+
+
+# Regression intervals:
+# create a dataframe to store predictions of the budburst date
+newd.4 <- data.frame(pA10 = rep(seq(min(lo_imp.d$pA10), max(lo_imp.d$pA10), length.out=100),1))
+# store predictions from lm model
+preds <- predict(lm.10,newdata=newd.4,se.fit=TRUE)
+mnlp <- preds$fit        #mean of the linear predictor
+selp <- preds$se.fit     #se of the linear predictor
+cillp <- mnlp - 2 * selp #lower of 95% CI for linear predictor
+ciulp <- mnlp + 2 * selp #upper
+
+# gather predictions into a data frame, 
+preds <- cbind(newd.4,preds,cillp,ciulp,mnlp)
+
+# plot the regression no lines
+p.10.a <- ggplot() +
+    
+    geom_point(mapping=aes(x=pA10,y=average_minTdep_fullyr, color = zone_nam_1), size = 3, data=lo_imp.d) +
+  geom_ribbon(mapping=aes(x=pA10,ymin=cillp,ymax=ciulp),
+                alpha=0.2,color = "gray", fill = "gray", data=preds) +
+  geom_text_repel() +
+  annotate(
+    "text", label = bquote(paste("10 m radius, p < 0.001, ", R^{"2"}, "= 0.28")),
+    x = 0.45, y =2.4, size = 3.7, colour = "black"
+  ) +
+     scale_color_manual(labels = zone_names, values = zone_colors, name = "10m" ) +
+    # xlim(c(-2,3)) +
+  # scale_y_continuous(breaks=seq(-15, 15, by = 5)) +
+  #  scale_fill_gradient(low="darkgreen", high ="white", name = " Proportion of  \n impervious surface  \n at 110 m radius", limits= c(min(lo_imp.d$pA110, na.rm= T), max(lo_imp.d$pA110, na.rm = T))) +
+   geom_line(mapping=aes(x=pA10,y=mnlp), color = "black", data=preds) +
+  # geom_hline(yintercept = 0, color = "blue", linetype = "dotted", size = 2) + 
+  #   geom_vline(xintercept = 0, color = "blue", linetype = "dotted", size = 2) + 
+  # ylab("Departure from average site min \n temperature (°C) 2019-2021") +
+  # xlab("proportion of impervious surface") +
+    ylab(" ") +
+   xlab("Proportion of impervious surface") +
+  theme(legend.position = "none") +
+  guides(color = FALSE) +
+  theme_classic()
+p.10.a
+
+```
+make a paneled set of figures
+```{r}
+grid.arrange(p.500.a, p.250.a, p.150.a, p.50.a, p.25.a, p.10.a)
+
+# save image
+png("images/Field-manuscript-figs/appendix10.impsurfaceradii.png")
+grid.arrange(p.500.a, p.250.a, p.150.a, p.50.a, p.25.a, p.10.a)
+dev.off()
+```
+
+
+# SM 11. Elevation, light, and distance to city center results
+
+```{r ggplot-elevation-new}
+
+boulder_outline <- readOGR("/Users/deidrejaeger/Documents/Career/CU-Boulder/Research/spring-snow-phenology/spatial_data/BoulderCityLimits/BoulderCityLimits.shp")
+
+
+df <- read.csv("data/spatial-site-data/spatial_sites.csv")
+# create a single set of trees, without the 2019 only trees, and add a site number
+df0 <- df %>% 
+  dplyr::select(Site) %>% 
+  unique() %>% 
+  filter(Site != "WOND", Site != "SUMA",Site != "UNIO",Site != "BAS1") %>% 
+  dplyr::mutate(site_number = seq(1:40))
+
+# join the df and df0
+df <- df %>% 
+  left_join(df0, by = "Site")
+
+# filter the 2019 only sites
+df<- df %>% 
+  filter(Site!= "WOND", Site!= "SUMA", Site!= "UNIO", Site!= "BAS1")
+unique(df$Site)
+
+# filter the second trees 
+df<- df %>% 
+  filter(second.tre != 2)
+
+# elevation as character
+df<- df %>% 
+  mutate(elevation_char= as.character(Elevation))
+
+#make the elevation an integer in meters
+df<- df %>%
+  mutate(elevation_int2= as.integer(elevation_char)*0.3048)
+
+
+p.ele <- ggplot() +  
+  geom_point(data= df, aes(x=coords.x1, y=coords.x2, color = elevation_int2), size=4) +
+  geom_polygon(data=boulder_outline, aes(x=long, y=lat, group=group), 
+               fill=NA,color="black", size=0.5) +
+  scale_color_gradient2(low="red", mid="gray", high ="blue", midpoint = (min(df$elevation_int2)+ ((max(df$elevation_int2)-min(df$elevation_int2))/2)), limits = c(min(df$elevation_int2), max(df$elevation_int2)), breaks = c(1575, 1600, 1625, 1650, 1675, 1700, 1725, 1775),labels = c(1575, 1600, 1625, 1650, 1675, 1700, 1725, 1775)) +
+  coord_equal() +
+  labs(color="elevation (m)") +
+  theme_map() +
+  theme(legend.position="right") +
+ theme(legend.key.width=unit(1, "cm"),
+        legend.key.height = unit(1.75, "cm"),
+        legend.title = element_text(size = 12),
+        legend.key.size = unit(5, "cm"),
+        legend.text = element_text(size = 12))
+p.ele
+
+png("images/Field-manuscript-figs/Final-figs-field/appendix11-elevation.png")
+p.ele
+dev.off()
+```
+
+
+```{r light spatial plot}
+# see if can load this pre-processed dataset from script 20
+boulder_outline <- readOGR("/Users/deidrejaeger/Documents/Career/CU-Boulder/Research/spring-snow-phenology/spatial_data/BoulderCityLimits/BoulderCityLimits.shp")
+
+df <- read.csv("data/spatial-site-data/spatial_sites.csv")
+# create a single set of trees, without the 2019 only trees, and add a site number
+df0 <- df %>% 
+  dplyr::select(Site) %>% 
+  unique() %>% 
+  filter(Site != "WOND", Site != "SUMA",Site != "UNIO",Site != "BAS1") %>% 
+  dplyr::mutate(site_number = seq(1:40))
+
+# light data 
+data_light <- read.csv("data/light/relative_site_light_standardized.csv")
+data_light$X = NULL
+names(data_light)[1] = "Site"
+names(data_light)[2] = "rel_light_site"
+
+
+# add the light data
+df <- df %>% 
+  left_join(data_light, by = "Site")
+
+
+# join the df and df0
+df <- df %>% 
+  left_join(df0, by = "Site")
+
+# filter the 2019 only sites
+df<- df %>% 
+  filter(Site!= "WOND", Site!= "SUMA", Site!= "UNIO", Site!= "BAS1")
+unique(df$Site)
+
+# filter the second trees 
+df<- df %>% 
+  filter(second.tre != 2)
+
+
+p.lig <- ggplot() +  
+  geom_point(data= df, aes(x=coords.x1, y=coords.x2, color = rel_light_site), size=4) +
+  geom_polygon(data=boulder_outline, aes(x=long, y=lat, group=group), 
+               fill=NA,color="black", size=0.5) +
+  scale_color_gradient2(low="black", mid="gray", high ="orange", midpoint = (min(df$rel_light_site)+ ((max(df$rel_light_site)-min(df$rel_light_site))/2)), limits = c(min(df$rel_light_site), max(df$rel_light_site))) +
+                        # breaks = c(1575, 1600, 1625, 1650, 1675, 1700, 1725, 1775),labels = c(1575, 1600, 1625, 1650, 1675, 1700, 1725, 1775)) +
+  coord_equal() +
+  labs(color="relative light (proportion relative \n to reference)") +
+  theme_map() +
+  theme(legend.position="right") +
+ theme(legend.key.width=unit(1, "cm"),
+        legend.key.height = unit(1.75, "cm"),
+        legend.title = element_text(size = 12),
+        legend.key.size = unit(5, "cm"),
+        legend.text = element_text(size = 12))
+p.lig
+
+png("images/Field-manuscript-figs/Final-figs-field/appendix11-light.png")
+p.lig
+dev.off()
+```
+
+
+```{r ggplot min temp}
+# prep leaf data
+
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leafout-temp-dep-2019-20-21.by-site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+
+
+p.temp <- f_t_dat_lo19.21 %>% 
+    ggplot() +  
+    geom_point(aes(x=coords.x1, y=coords.x2, color = average_minTdep_fullyr),  size = 4) +
+    geom_polygon(data=boulder_outline, aes(x=long, y=lat, group=group), 
+                 fill=NA,color="black", size=0.5) +
+    scale_color_gradient(low="blue", high ="red", name = " Departure from min monthly temp (C)", limits= c(min(f_t_dat_lo19.21$average_minTdep_fullyr), max(f_t_dat_lo19.21$average_minTdep_fullyr))) +
+    coord_equal() +
+    theme_map() +
+    theme(legend.position="right") +
+    # theme(legend.key.width=unit(3, "cm"))
+
+theme(legend.key.width=unit(1, "cm"),
+        legend.key.height = unit(1.75, "cm"),
+        legend.title = element_text(size = 12),
+        legend.key.size = unit(5, "cm"),
+        legend.text = element_text(size = 12))
+
+p.temp
+
+png("images/Field-manuscript-figs/Final-figs-field/appendix11-temp.png")
+p.temp
+dev.off()
+
+```
+
+
+```{r - arrange as 3 panel grid}
+grid.arrange(p.ele, p.lig, p.temp, ncol = 2, nrow = 2)
+
+png("images/Field-manuscript-figs/Final-figs-field/appendix11-grid.png")
+grid.arrange(p.ele, p.lig, p.temp, ncol = 2, nrow = 2)
+dev.off()
+# does not save in good ratio- screenshot it instead
+```
+
+
+# SM 11. Elevation, light, and distance to city center results
+
+
+leaf + temp + dbh + height
+```{r leaves-temp-treevariables}
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leafout-temp-dep-2019-20-21.by-site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+# summarize across the years
+field.d <- f_t_dat_lo19.21 %>% 
+  group_by(Site) %>% 
+   summarize(leaf.d.all = mean(jul0.5_TGLO_d, na.rm = TRUE), temp.d.all = mean(average_minTdep_fullyr, na.rm = TRUE), zone_nam_1 = zone_nam_1) %>% 
+  distinct()
+
+# merge data
+field.d<- field.d %>% 
+  left_join(imp_s.s, by = "Site")
+
+# load site variables
+site.var <- read.csv(file = "data/site_variables/dist.city.center.csv")
+
+
+# add the ither site variables
+field.d <- field.d %>% 
+  left_join(site.var, by = "Site")
+
+
+# Multiple Linear Regression Example
+fit <- lm(leaf.d.all ~ temp.d.all + Tree_dbh + Tree_height, data=field.d)
+summary(fit) # show results
+
+coefficients(fit) # model coefficients
+confint(fit, level=0.95) # CIs for model parameters
+fitted(fit) # predicted values
+residuals(fit) # residuals
+anova(fit) # anova table
+vcov(fit) # covariance matrix for model parameters
+layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page
+plot(fit)
+
+# look at dbh and height singly
+fit.dbh <- lm(leaf.d.all ~ Tree_dbh, data=field.d)
+summary(fit.dbh) # show results
+fit.ht <- lm(leaf.d.all ~ Tree_height, data=field.d)
+summary(fit.ht) # show results
+
+```
+
+flower + temp + dbh + height
+```{r flowers-temp-treevariables}
+f_t_dat_ft19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/flower-tip-temp-dep-2019-20-21.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+f_t_dat_ft19.21$Site <- as.factor(f_t_dat_ft19.21$Site)
+
+# load imp surface data
+imp_s.s <- read.csv("data/spatial-site-data/imp_surf.sites.csv")
+
+# summarize across the years
+field.d <- f_t_dat_ft19.21 %>% 
+  group_by(Site) %>% 
+   summarize(flower.d.all = mean(jul0.2_TGFT_d, na.rm = TRUE), temp.d.all = mean(average_minTdep_fullyr, na.rm = TRUE), zone_nam_1 = zone_nam_1) %>% 
+  distinct()
+
+# merge data
+field.d<- field.d %>% 
+  left_join(imp_s.s, by = "Site")
+
+# load site variables
+site.var <- read.csv(file = "data/site_variables/dist.city.center.csv")
+
+
+# add the ither site variables
+field.d <- field.d %>% 
+  left_join(site.var, by = "Site")
+
+# look at dbh and height singly
+fit.dbh <- lm(flower.d.all ~ Tree_dbh, data=field.d)
+summary(fit.dbh) # show results
+fit.ht <- lm(flower.d.all ~ Tree_height, data=field.d)
+summary(fit.ht) # show results
+
+# Multiple Linear Regression Example
+fit2 <- lm(flower.d.all ~ temp.d.all + Tree_dbh + Tree_height, data=field.d)
+summary(fit2) # show results
+
+coefficients(fit2) # model coefficients
+confint(fit2, level=0.95) # CIs for model parameters
+fitted(fit2) # predicted values
+residuals(fit2) # residuals
+anova(fit2) # anova table
+vcov(fit2) # covariance matrix for model parameters
+layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page
+plot(fit2)
+```
+
+temp + light,elevation, city centers, impervious surface
+```{r temp-data}
+#load datasets
+leaf.d <- read.csv("data/mixedmodel-datasets/leaf-mixed-model-regression-data.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# make site a factor
+leaf.d$Site <- as.factor(leaf.d$Site)
+# make site a factor
+leaf.d$zone_nam_1 <- as.factor(leaf.d$zone_nam_1)
+
+# Multiple Linear Regression + just the sig light and pear CC
+fit3 <- lm(temp.d.all ~ pA250 + rel_light_site + Dist_center_pearl_m, data=leaf.d)
+summary(fit3) # show results
+
+# Multiple Linear Regression + BOTH city center variable + no Zone
+fit3 <- lm(temp.d.all ~ pA250 + Dist_center_28th_m + Elevation + rel_light_site + Dist_center_pearl_m, data=leaf.d)
+summary(fit3) # show results
+
+# Adjusted R-squared:  0.5321  
+
+coefficients(fit3) # model coefficients
+confint(fit3, level=0.95) # CIs for model parameters
+fitted(fit3) # predicted values
+residuals(fit3) # residuals
+anova(fit3) # anova table
+vcov(fit3) # covariance matrix for model parameters
+layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page
+plot(fit3)
+```
+
+
+# SM 12. Land-use zone results 
+
+```{r summarize -sd-se-functions}
+#+++++++++++++++++++++++++
+# Function to calculate the mean and the standard deviation
+  # for each group
+#+++++++++++++++++++++++++
+# data : a data frame
+# varname : the name of a column containing the variable
+  #to be summariezed
+# groupnames : vector of column names to be used as
+  # grouping variables
+data_summary.se <- function(data, varname, groupnames){
+  calcSE <- function(x){sd(x)/sqrt(length(x))}
+  
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      se = calcSE(x[[col]]),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+  
+ return(data_sum)
+}
+```
+
+```{r -barplot function -imp surface}
+pre.post_barplot.se.i <- function(dataset, question, grouping.col ) {
+  
+  #### function to create a bar plot with errors bars shaowing the standard deviation (spread of data)
+  # dataset is a dataframe that needs to have a grouping column ( ex: in prepost data this is type with levels pre and post)
+  # question should be the column name for a particular questions, in quotes
+  # grouping.col should be the column with the 2 levels, in quotes
+  # returns a bar plot of pre/post data
+  
+mean.se.sd.summary <- data_summary.se(data = dataset, varname = question, groupnames = grouping.col)
+names(mean.se.sd.summary)[1] <- "levels"
+names(mean.se.sd.summary)[2] <- "mean"
+names(mean.se.sd.summary)[3] <- "se"
+names(mean.se.sd.summary)[4] <- "sd"
+
+fill.colors <- c("orange", "pink", "yellow", "springgreen", "darkgreen")
+
+  p.1 <- ggplot(data = mean.se.sd.summary, aes(x= levels, y = mean, fill = levels)) +
+    scale_fill_manual(values = fill.colors) +
+  geom_bar(stat = "identity", color = "black", 
+  position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2,
+                 position=position_dodge(.9)) +
+  ylab("Impervious surface proportion (250 m radius)") + 
+    xlab("Land-use zone") +
+    theme_classic()+
+    theme(axis.text.x = element_blank())
+  return(p.1)
+}
+
+
+```
+
+```{r load dataset}
+# load imp surface data
+imp_s <- read.csv(file = "data/paige_analysis/light_impervious_surf_radii_by_site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+
+lo_d <- read.csv(file = "data/outputs/combined-temp-pheno-dat/leafout-temp-dep-2019-20-21.by-site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE) #this is not opening properly 1/25/2022 but was the 
+
+temp.site <- lo_d %>% 
+  dplyr::select(average_minTdep_fullyr, Site, zone_nam_1) %>% 
+  distinct()
+
+
+# calc the mean in squared to feet, 1 meter = 3.28 feet
+imp_s.s <- imp_s %>% 
+  group_by(Site) %>% 
+  summarize( tot_500m.s = (mean(tot_500m, na.rm = TRUE)), tot_250m.s = (mean(tot_250m, na.rm = TRUE)), tot_150m.s = (mean(tot_150m, na.rm = TRUE)), tot_50m.s = (mean(tot_50m, na.rm = TRUE)), tot_25m.s = (mean(tot_25m, na.rm = TRUE)), tot_10m.s = (mean(tot_10m, na.rm = TRUE))) 
+
+# merge data
+lo_imp.d<- temp.site %>% 
+  left_join(imp_s.s, by = "Site")
+
+# calc the proportion of imp surface out of the radius in  FEET
+# add the totoal area for each radii
+lo_imp.d <- lo_imp.d %>% 
+  mutate(totA_10 = 3381.9, totA_25 = 21134.4, totA_50 = 84537.5, totA_150 = 760775.6, totA_250 = 2113437.5, totA_500 = 8453749.9) 
+
+# calc the proportion of imp surface out of the radius in  FEET
+# add the totoal area for each radii
+lo_imp.d <- lo_imp.d %>% 
+  mutate(totA_10 = 3381.9, totA_25 = 21134.4, totA_50 = 84537.5, totA_150 = 760775.6, totA_250 = 2113437.5, totA_500 = 8453749.9) 
+
+# calc the proportions
+lo_imp.d <- lo_imp.d %>% 
+  mutate(pA10 = (tot_10m.s/totA_10), pA25 = (tot_25m.s/totA_25), pA50 = (tot_50m.s/totA_50), pA150 = (tot_150m.s/totA_150), pA250 = (tot_250m.s/totA_250), pA500 = (tot_500m.s/totA_500))
+
+ # change NaN to NA so it doest mess up the calculations later on
+lo_imp.d$pA10[is.nan(lo_imp.d$pA10)]<-NA
+  # change NaN to NA so it doest mess up the calculations later on
+lo_imp.d$pA25[is.nan(lo_imp.d$pA25)]<-NA
+  # change NaN to NA so it doest mess up the calculations later on
+lo_imp.d$pA50[is.nan(lo_imp.d$pA50)]<-NA
+
+lo_imp.d$pA150 <- as.numeric(lo_imp.d$pA150)
+
+#reorder zone levels
+lo_imp.d$zone_nam_1 <- factor(lo_imp.d$zone_nam_1, levels= c("Business-district", 
+                            "Residential-high",
+                           "Residential-med",
+                           "Residential-low",
+                           "Park"))
+zone_names <- c("Business-district" = "Business-district", 
+                  "Residential-high" = "Residential-high", 
+                  "Residential-med" = "Residential-med", 
+                  "Residential-low" = "Residential-low", 
+                  "Park" = "Park")
+  
+  zone_colors <- c("Business-district" = "orange", 
+                   "Residential-high" = "pink", 
+                   "Residential-med" = "yellow", 
+                   "Residential-low" = "green", 
+                   "Park" = "darkgreen")
+
+```
+
+Zone comparison with imp surface
+```{r}
+#reorder zone levels
+lo_imp.d$zone_nam_1 <- factor(lo_imp.d$zone_nam_1, levels= c("Business-district", 
+                            "Residential-high",
+                           "Residential-med",
+                           "Residential-low",
+                           "Park"))
+
+#ANOVA of imp surf by Zone
+aov.zone.imp <- aov(pA250~zone_nam_1, data = lo_imp.d)
+summary(aov.zone.imp)
+TukeyHSD(aov.zone.imp)
+
+# test function with renamed vars
+dataset = lo_imp.d
+question = "pA250"
+grouping.col = "zone_nam_1"
+
+p.zone.imp <- pre.post_barplot.se.i(dataset = dataset, question = question, grouping.col = grouping.col)
+p.zone.imp
+
+# look at means
+mean.se.sd.summary <- data_summary.se(data = dataset, varname = question, groupnames = grouping.col)
+
+mean.se.sd.summary
+
+```
+
+```{r -barplot function -temp}
+pre.post_barplot.se.t <- function(dataset, question, grouping.col ) {
+  
+  #### function to create a bar plot with errors bars shaowing the standard deviation (spread of data)
+  # dataset is a dataframe that needs to have a grouping column ( ex: in prepost data this is type with levels pre and post)
+  # question should be the column name for a particular questions, in quotes
+  # grouping.col should be the column with the 2 levels, in quotes
+  # returns a bar plot of pre/post data
+  
+mean.se.sd.summary <- data_summary.se(data = dataset, varname = question, groupnames = grouping.col)
+names(mean.se.sd.summary)[1] <- "levels"
+names(mean.se.sd.summary)[2] <- "mean"
+names(mean.se.sd.summary)[3] <- "se"
+names(mean.se.sd.summary)[4] <- "sd"
+
+fill.colors <- c("orange", "pink", "yellow", "springgreen", "darkgreen")
+
+  p.1 <- ggplot(data = mean.se.sd.summary, aes(x= levels, y = mean, fill = levels)) +
+    scale_fill_manual(values = fill.colors) +
+  geom_bar(stat = "identity", color = "black", 
+  position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2,
+                 position=position_dodge(.9)) +
+  ylab("Minimum temperature departure (°C)") + 
+    xlab("Land-use zone") +
+    theme_classic()+
+    theme(axis.text.x = element_blank())
+  return(p.1)
+}
+
+
+```
+
+Zone comparison with Temp
+```{r}
+# reorder zones
+lo_imp.d$zone_nam_1 <- factor(lo_imp.d$zone_nam_1, levels= c("Business-district", 
+                            "Residential-high",
+                           "Residential-med",
+                           "Residential-low",
+                           "Park"))
+
+
+#ANOVA of temp by Zone
+aov.zone.temp <- aov(average_minTdep_fullyr~zone_nam_1, data = lo_imp.d)
+summary(aov.zone.temp)
+TukeyHSD(aov.zone.temp)
+
+# test function with renamed vars
+dataset = lo_imp.d
+question = "average_minTdep_fullyr"
+grouping.col = "zone_nam_1"
+
+p.zone.temp <- pre.post_barplot.se.t(dataset = dataset, question = question, grouping.col = grouping.col)
+p.zone.temp
+
+mean.se.sd.summary <- data_summary.se(data = dataset, varname = question, groupnames = grouping.col)
+
+mean.se.sd.summary
+```
+create a grid of zone and impervious surface and temp
+```{r}
+grid.arrange(p.zone.imp, p.zone.temp, nrow = 1)
+
+# save image
+png("images/Field-manuscript-figs/Final-figs-field/Appendix13-zone-imp_zone-temp_bar.png")
+grid.arrange(p.zone.imp, p.zone.temp, nrow = 1)
+dev.off()
+
+
+```
