@@ -1,0 +1,1418 @@
+---
+title: "49_final_manuscript_code_revised1"
+output: html_document
+date: "2026-11-20"
+---
+
+# Script to generate the results for the manuscript figures, tables, text for the field paper, and supplementary materials
+
+# Last updated in Sep 2026 dataset following reviewer suggestions that keeps phenology separated by year and tree, so those can be random effects. 
+
+Table of contents
+
+Results text, tables
+3.1 Intra-urban phenological variation 
+3.2 Abiotic and biotic predictors of tree phenology
+3.2.1 Intra-urban temperature relationship with phenology
+3.2.2 Impervious surface relationship with phenology
+3.2.3 Land-use zones relationships with phenology
+3.2.4 Tree size and phenology
+
+3.3 Temperature variation and landscape relationships
+3.3.1 Intraurban temperature departures 
+3.3.2 Impervious surface, elevation, light, distance to city center  relationship with temperature
+3.3.3 Land cover relationship with temperature
+
+
+```{r load-libraries}
+
+library(ggthemes) # for a cleaner map withouth coordinates and axis labels
+library(ggplot2)
+library(dplyr)
+library(ggrepel)
+library(ggspatial) # for scale  bars
+# library(rgdal) # needed to read in boulder shapefile *CANNNOT LOAD SEP 2026
+# install.packages("rgdal") # or can used sf or terra instead
+# install.packages("sf") # for loading shapefiels
+library(sf)
+library(broom) # for boulder outline
+library(raster) # for spatial extents and crs
+# library(tidyr) #for pivot
+library(lubridate)
+library(gridExtra)
+library(ggpubr) # for box plots
+# install.packages("ggspatial")
+# library(ggspatial)
+library(lme4) # for lmer
+library(lmerTest) # for lmer p values based on degrees of freedom
+library(DHARMa)        # simulation-based residual checks (very good for mixed models)
+# looking at relationship of impervious surface with temperature 16.June.2026
+library(mgcv) # for GAM analysis
+library(marginaleffects) # for GAM analysis
+
+library(patchwork) # for gridding with one legend
+```
+
+Final code package citations
+```{r package-citations}
+citation("lme4") # for lmer
+citation("lmerTest") # for lmer p values based on degrees of freedom
+citation("DHARMa")        # simulation-based residual checks (very good for mixed models)
+# looking at relationship of impervious surface with temperature 16.June.2026
+citation("mgcv") # for GAM analysis
+citation("marginaleffects") # for GAM analysis
+
+# saving all them
+knitr::write_bib(c(.packages(), "base"), "packages.bib")
+
+# check R version number
+R.version.string
+
+# look at package citations and version numbers
+citation("lme4")
+packageVersion("lme4")
+citation("lmerTest")
+packageVersion("lmerTest")
+citation("DHARMa")
+packageVersion("DHARMa")
+citation("mgcv")
+packageVersion("mgcv")
+citation("marginaleffects")
+packageVersion("marginaleffects")
+citation("emmeans")
+packageVersion("emmeans")
+citation("stats")
+
+
+```
+
+# Results text sections
+# 3.1 Intra-urban phenological variation 
+```{r - julian-day-results}
+# load data
+pheno.f <- read.csv("data/field-data-2019-2021/field-data-by-site-all_phenophase_by_site_jul_and_dep.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# filter to just leaf open and flower emerge
+pheno.f.lo.ft <- pheno.f %>%
+  filter(phenophase == "leafopen" | phenophase == "floweremerge")
+
+# 2020 julian day range - leaves
+pheno.f.lo.ft %>% 
+  filter(year == "2020", phenophase == "leafopen") %>% 
+  summarize(jul.min = min(jul0.5_0.2, na.rm = TRUE), jul.max = max(jul0.5_0.2, na.rm = TRUE), jul.var = max(jul0.5_0.2, na.rm = TRUE)-min(jul0.5_0.2, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE)) %>% View()
+
+
+# 2021 julian day range - flowers
+
+pheno.f.lo.ft %>% 
+  filter(year == "2021", phenophase == "floweremerge") %>% 
+  summarize(jul.min = min(jul0.5_0.2, na.rm = TRUE), jul.max = max(jul0.5_0.2, na.rm = TRUE), jul.var = max(jul0.5_0.2, na.rm = TRUE)-min(jul0.5_0.2, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE)) %>% View()
+
+# average range - leaves
+  # Which site had the earliest leaf emergence on average
+pheno.f.lo.ft %>% 
+  filter(year == "average", phenophase == "leafopen") %>% 
+ slice(which.min(jul0.5_0.2))  %>% View() # CUNO earliest
+
+ # Which site had the latest leaf emergence on average
+pheno.f.lo.ft %>% 
+  filter(year == "average", phenophase == "leafopen") %>% 
+ slice(which.max(jul0.5_0.2))  %>% View() # NOBO latest
+
+
+
+# average range - flowers
+
+  # Which site had the earliest flower emergence on average
+pheno.f.lo.ft %>% 
+  filter(year == "average", phenophase == "floweremerge") %>% 
+ slice(which.min(jul0.5_0.2))  %>% View() # 14ST earliest
+
+ # Which site had the latest flower emergence on average
+pheno.f.lo.ft %>% 
+  filter(year == "average", phenophase == "floweremerge") %>% 
+ slice(which.max(jul0.5_0.2))  %>% View() # THU2 latest
+
+```
+
+```{r intrauraban pheno variation - leaves}
+# load data
+pheno.f <- read.csv("data/field-data-2019-2021/field-data-dep-by-site-all_phenophase_by_site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# leaf open min and max variation
+# Max-Min site variation
+pheno.f %>% 
+  filter(year == "average", phenophase == "leafopen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE), total.var.sd = sd(pheno_dep_l50_f20, na.rm = TRUE)) %>% View()
+
+# Which site was earliest to leaf open
+pheno.f %>% 
+  filter(year == "average", phenophase == "leafopen") %>% 
+ slice(which.min(pheno_dep_l50_f20)) # 14ST earliest
+
+# what was the st deviation of that site
+pheno.f %>%
+  filter(Site == "14ST", phenophase == "leafopen") %>% 
+  summarize(site_sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+
+# which site was latest to leaf open
+pheno.f %>% 
+  filter(year == "average", phenophase == "leafopen") %>% 
+ slice(which.max(pheno_dep_l50_f20))  # THU2 latest
+
+#what is the st deviation of that site
+pheno.f %>%
+  filter(Site == "NOBO", phenophase == "leafopen") %>% 
+  summarize(site_sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+
+# what is the span in leaf opening for each year?
+# Max-Min site variation
+
+#2019
+pheno19 = pheno.f %>% 
+  filter(year == "2019", phenophase == "leafopen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2020
+pheno20 = pheno.f %>% 
+  filter(year == "2020", phenophase == "leafopen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2021
+pheno21= pheno.f %>% 
+  filter(year == "2021", phenophase == "leafopen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+# budscale green min and max variation
+#2019
+pheno.f %>% 
+  filter(year == "2019", phenophase == "budgreen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2020
+pheno.f %>% 
+  filter(year == "2020", phenophase == "budgreen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2021
+pheno.f %>% 
+  filter(year == "2021", phenophase == "budgreen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+# average budscale greening difference
+pheno.f %>% 
+  filter(year == "average", phenophase == "budgreen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE), total.var.sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+
+# leaf emergence min and max variation
+#2019
+pheno.f %>% 
+  filter(year == "2019", phenophase == "leaftip") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2020
+pheno.f %>% 
+  filter(year == "2020", phenophase == "leaftip") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2021
+pheno.f %>% 
+  filter(year == "2021", phenophase == "leaftip") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+# average budscale greening difference
+pheno.f %>% 
+  filter(year == "average", phenophase == "leaftip") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE), total.var.sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+
+```
+
+```{r intrauraban pheno variation - flower emergence}
+
+# load data
+pheno.f <- read.csv("data/field-data-2019-2021/field-data-dep-by-site-all_phenophase_by_site.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# flower emerge min and max variation
+# Max-Min site variation
+pheno.f %>% 
+  filter(year == "average", phenophase == "floweremerge") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE), total.var.sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+
+
+# Which site was earliest to flower emerge
+pheno.f %>% 
+  filter(year == "average", phenophase == "floweremerge") %>% 
+ slice(which.min(pheno_dep_l50_f20)) # 14ST earliest
+
+# what was the st deviation of that site
+pheno.f %>%
+  filter(Site == "14ST", phenophase == "floweremerge") %>% 
+  summarize(site_sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+
+# which site was latest to leaf open
+pheno.f %>% 
+  filter(year == "average", phenophase == "floweremerge") %>% 
+ slice(which.max(pheno_dep_l50_f20))  # THU2 latest
+
+#what is the st deviation of that site
+pheno.f %>%
+  filter(Site == "THU2", phenophase == "floweremerge") %>% 
+  summarize(site_sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+
+# what is the span in leaf opening for each year?
+# Max-Min site variation
+
+#2019
+pheno.f %>% 
+  filter(year == "2019", phenophase == "floweremerge") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2020
+pheno.f %>% 
+  filter(year == "2020", phenophase == "floweremerge") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2021
+pheno.f %>% 
+  filter(year == "2021", phenophase == "floweremerge") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+
+### FLower opening data
+# min and max variation
+#2019
+pheno.f %>% 
+  filter(year == "2019", phenophase == "floweropen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2020
+pheno.f %>% 
+  filter(year == "2020", phenophase == "floweropen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+#2021
+pheno.f %>% 
+  filter(year == "2021", phenophase == "floweropen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE))
+
+# average difference
+pheno.f %>% 
+  filter(year == "average", phenophase == "floweropen") %>% 
+  summarize(s.low.var = min(pheno_dep_l50_f20, na.rm = TRUE), s.high.var = max(pheno_dep_l50_f20, na.rm = TRUE), total.var = max(pheno_dep_l50_f20, na.rm = TRUE)-min(pheno_dep_l50_f20, na.rm = TRUE), total.var.sd = sd(pheno_dep_l50_f20, na.rm = TRUE))
+```
+
+```{r average-annual-temp}
+# look at annual temp just from Jan - May- the forcing temperatures
+
+# load data
+bt.dat.month.dep.s <- read.csv( file = "data/2019-2021_temp_data/summaries/monthly_depart_2019-21.spatial.csv")
+
+# Jan 2019- May 2019
+t.2019 <- bt.dat.month.dep.s %>%
+  filter(year == 2019, month < 6) %>% 
+  dplyr::select(month, year, sensor_name8, mean_tempC:max_tempC) %>% 
+  summarise(meanC = mean(mean_tempC, na.rm = T), mean_sd = sd(mean_tempC, na.rm = T), minC = mean(min_tempC, na.rm = T), min_sd = sd(min_tempC, na.rm = T), maxC = mean(max_tempC, na.rm = T), max_sd = sd(max_tempC, na.rm = T)) %>% 
+  mutate(year= "2019")
+
+
+# Jan 2020 - May 2020
+t.2020 <- bt.dat.month.dep.s %>%
+  filter(year == 2020, month < 6) %>% 
+  dplyr::select(month, year, sensor_name8, mean_tempC:max_tempC) %>% 
+  summarise(meanC = mean(mean_tempC, na.rm = T), mean_sd = sd(mean_tempC, na.rm = T), minC = mean(min_tempC, na.rm = T), min_sd = sd(min_tempC, na.rm = T), maxC = mean(max_tempC, na.rm = T), max_sd = sd(max_tempC, na.rm = T)) %>% 
+  mutate(year= "2020")
+
+# Jan 2021 - May 2021
+t.2021 <- bt.dat.month.dep.s %>%
+  filter(year == 2021, month < 6) %>% 
+  dplyr::select(month, year, sensor_name8, mean_tempC:max_tempC) %>% 
+ summarise(meanC = mean(mean_tempC, na.rm = T), mean_sd = sd(mean_tempC, na.rm = T), minC = mean(min_tempC, na.rm = T), min_sd = sd(min_tempC, na.rm = T), maxC = mean(max_tempC, na.rm = T), max_sd = sd(max_tempC, na.rm = T)) %>% 
+  mutate(year= "2021")
+
+# bind table
+annual_temps <- rbind(t.2019, t.2020, t.2021)
+
+write.csv(annual_temps, "data/outputs/annual_temps/annual_temps_study_period.csv")
+
+```
+
+# 3.2 Predictors of tree phenology
+## Intra-urban temperature relationship with phenology 
+
+```{r LMM leaves - temp}
+
+library(lme4) # for lmer
+library(lmerTest) # for lmer p values based on degrees of freedom
+library(DHARMa)        # simulation-based residual checks (very good for mixed models)
+library(performance)
+
+
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leaf-predictors.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+f_t_dat_lo19.21 <- f_t_dat_lo19.21 %>% 
+  dplyr::rename(Tree = SSS.tag_as, Year = year)
+
+# preapare gounping variables
+# make site a factor
+f_t_dat_lo19.21$Site <- as.factor(f_t_dat_lo19.21$Site) 
+f_t_dat_lo19.21$Year <- as.factor(f_t_dat_lo19.21$Year)
+
+# YEAR SHOWED no variation as a random effect, so dropped
+# # temp NO REML , use maximum likihood (ML)
+# lo.mixed.tl<- lmerTest::lmer(jul0.5_TGLO_d ~  average_minTdep_l + (1 | Year) + (1 | Site) + (1 | Site:Tree) , REML =  FALSE, data = f_t_dat_lo19.21)
+# lo.mixed.tl
+# summary(lo.mixed.tl)
+
+# temp WITH YEAR  , use maximum likihood (ML)
+lo.mixed.tl<- lmerTest::lmer(jul0.5_TGLO_d ~  average_minTdep_l + (1| Year) + (1 | Site) + (1 | Site:Tree) , REML =  FALSE, data = f_t_dat_lo19.21)
+lo.mixed.tl
+summary(lo.mixed.tl)
+# temp NO REML , use maximum likihood (ML)
+lo.mixed.tl<- lmerTest::lmer(jul0.5_TGLO_d ~  average_minTdep_l + (1 | Site) + (1 | Site:Tree) , REML =  FALSE, data = f_t_dat_lo19.21)
+lo.mixed.tl
+summary(lo.mixed.tl)
+
+# see slope. The estimate is the Slope, which is the average change in the dependent variable (leaf open) for every one unit increase in the independent variable (temp). So for every 1 degree increase in average temp departure, leaf burst is 3.17 days earlier. 
+
+VarCorr(lo.mixed.tl)
+
+# Residuals vs fitted — look for no pattern, constant spread
+plot(lo.mixed.tl)
+
+# Q-Q plot of residuals — check normality - some S tailed a bit
+qqnorm(resid(lo.mixed.tl)); qqline(resid(lo.mixed.tl))
+
+# Use dharma to simulate residuals
+sim_res.l <- simulateResiduals(lo.mixed.tl, allow.new.levels = TRUE)
+plot(sim_res.l)
+
+# Specific tests
+testDispersion(sim_res.l)
+testOutliers(sim_res.l) #significant. We should Test if dropping the outliers and see if we get a similare result
+
+
+# can calculate the proportion of total variance attributable to each grouping level, to say X % of the variation in budburst timing that isn't explained by temp is due to the differences between sites, versus 15% duue to differences between trees within a site.
+vc.l <- as.data.frame(VarCorr(lo.mixed.tl))
+vc.l$vcov / sum(vc.l$vcov)   # proportion of variance per component
+
+# use performance package to calculate a marginal and conditional r2
+performance::r2(lo.mixed.tl)
+# Marginal R²: variance explained by fixed effects only (temperature)
+#Conditional R²: variance explained by fixed + random effects together
+
+# The gap between them tells you how much of your model's explanatory power comes from the site/tree structure versus temperature itself.
+
+
+AIC(lo.mixed.tl) # lower AIC better, When you fit a linear mixed-effects model, R defaults to REML (Restricted Maximum Likelihood) estimation because it provides unbiased estimates for variance components. However, you cannot compare AIC values between models with different fixed effects if they are fitted using REML.If you are comparing models with different fixed effect structures, you must set REML = FALSE (or use Maximum Likelihood, method = "ML") in your model function
+```
+
+```{r table- leaf lmm results}
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leaf-predictors.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+f_t_dat_lo19.21 <- f_t_dat_lo19.21 %>% 
+  dplyr::rename(Tree = SSS.tag_as, Year = year)
+
+# preapare gounping variables
+# make site a factor
+f_t_dat_lo19.21$Site <- as.factor(f_t_dat_lo19.21$Site) 
+f_t_dat_lo19.21$Year <- as.factor(f_t_dat_lo19.21$Year)
+
+
+# install.packages("sjPlot")
+library(sjPlot) # table functions
+
+#  Year as a random effect, however no variance in leaf between year, boundary (singular) fit: see help('isSingular') so it should be dropped
+lo.mixed.1 <- lmerTest::lmer(jul0.5_TGLO_d ~ average_minTdep_l + (1 | Year) + (1 | Site) + (1 | Site:Tree) , data = f_t_dat_lo19.21)
+lo.mixed.1
+
+
+# redo temp and pheno with no year in the model
+lo.mixed <- lmerTest::lmer(jul0.5_TGLO_d ~ average_minTdep_l + (1 | Site) + (1 | Site:Tree) , data = f_t_dat_lo19.21)
+lo.mixed
+summary(lo.mixed)
+VarCorr(lo.mixed)
+
+
+sjPlot::tab_model(lo.mixed.1, lo.mixed, 
+                                  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "Minimum temp departure (C)"),
+
+  # 2. Custom dependent variable label
+  dv.labels = c("leaf opening","leaf opening"),
+    show.aic = TRUE,
+
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+
+# save this to show reviewers asking for year in the reviewer response
+
+# final table with temp (no year) and imp surface
+
+# example for adjusting the labels
+sjPlot::tab_model(lo.mixed,
+  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "minimum temp departure C"),
+
+  # 2. Custom dependent variable label
+  dv.labels = c("leaf opening"),
+    show.aic = TRUE,
+
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+
+```
+
+```{r LMM flowers- temp}
+
+library(lme4) # for lmer
+library(lmerTest) # for lmer p values based on degrees of freedom
+library(DHARMa)        # simulation-based residual checks (very good for mixed models)
+library(performance)
+
+# prep flower data
+
+f_t_dat_ft19.21  <- read.csv("data/outputs/combined-temp-pheno-dat/flower-predictors.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+f_t_dat_ft19.21  <- f_t_dat_ft19.21 %>% 
+  rename(Tree = SSS.tag_as, Year = year)
+
+# preapare gounping variables
+# make site a factor
+f_t_dat_ft19.21$Site <- as.factor(f_t_dat_ft19.21$Site) 
+f_t_dat_ft19.21$Year <- as.factor(f_t_dat_ft19.21$Year)
+
+# fl.mixed <- lmer(y ~ x + (1 | group), data = my_data)
+fl.mixed <- lmer(jul0.2_TGFT_d ~ average_minTdep_f + (1| Year) + (1 | Site) + (1 | Site:Tree), data = f_t_dat_ft19.21)
+
+fl.mixed
+summary(fl.mixed)
+
+VarCorr(fl.mixed)
+
+# interpretation: 
+# Site variance: how much budburst timing varies between sites, after accounting for temperature. Large relative to Tree:Site → site-level factors (soil, microclimate, elevation) matter a lot.
+ # in our case, the site explains more than the tree in a site, but not a ton more after accounting for temp. 
+# Tree:Site variance: how much individual trees differ from each other within the same site. Large relative to Site → individual tree genetics/exposure matter more than which site they're in.
+# Residual variance: leftover variation not explained by site, tree, or temperature — includes year-to-year noise, measurement error, unmeasured factors.
+
+# Residuals vs fitted — look for no pattern, constant spread
+plot(fl.mixed)
+
+# Q-Q plot of residuals — check normality - some S tailed a bit
+qqnorm(resid(fl.mixed)); qqline(resid(fl.mixed))
+
+#  the smallest and largest observations (left-hand and right-hand sides of the QQ-plot, respectively) have an s-tail, 
+# the smallest observations are smaller than you would expect from a normal distribution (i.e. the points are below the line on the QQ-plot). This means the lower tail of the data’s distribution has beenextended, relative to a normal distribution.
+# the largest observations are larger than you would expect from a normal distribution (i.e. the points are above the line on the QQ-plot). This means the upper tail of the data’s distribution has beenextended, relative to a normal distribution (https://www.ucd.ie/ecomodel/resources/examplesofquantile-quantileplots/)
+
+# Use dharma to simulate residuals
+sim_res <- simulateResiduals(fl.mixed)
+plot(fl.mixed)
+
+# Specific tests
+# # Test for overdispersion or underdispersion
+# Simulation-based: It compares the standard deviation (or variance) of the observed scaled quantile residuals against the standard deviation of residuals generated from data simulated under the fitted model.Nonparametric: It avoids strict distributional or asymptotic assumptions by relying purely on the simulated residual distributions.Interpretation: A dispersion statistic close to 1.0 indicates proper dispersion (equidispersion), whereas values significantly greater than 1 suggest overdispersion (excess variance), and values lower than 1 suggest underdispersion. The accompanying p-value tests whether this deviation is statistically significant.
+
+testDispersion(sim_res)
+# not sig , so not over/unde dispersed
+
+
+testOutliers(sim_res)
+# sig outlier
+
+
+# can calculate the proportion of total variance attributable to each grouping level, to say X % of the variation in budburst timing that isn't explained by temp is due to the differences between sites, versus 15% duue to differences between trees within a site.
+vc.f <- as.data.frame(VarCorr(fl.mixed))
+vc.f$vcov / sum(vc.f$vcov)   # proportion of variance per component
+
+# use performance package to calculate a marginal and conditional r2
+performance::r2(fl.mixed)
+
+# Marginal R²: variance explained by fixed effects only (temperature)
+#Conditional R²: variance explained by fixed + random effects together
+
+# The gap between them tells you how much of your model's explanatory power comes from the site/tree structure versus temperature itself.
+
+AIC(fl.mixed) # lower AIC better, When you fit a linear mixed-effects model, R defaults to REML (Restricted Maximum Likelihood) estimation because it provides unbiased estimates for variance components. However, you cannot compare AIC values between models with different fixed effects if they are fitted using REML.If you are comparing models with different fixed effect structures, you must set REML = FALSE (or use Maximum Likelihood, method = "ML") in your model function
+```
+
+```{r table- flower lmm results}
+f_t_dat_ft19.21  <- read.csv("data/outputs/combined-temp-pheno-dat/flower-predictors.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+f_t_dat_ft19.21  <- f_t_dat_ft19.21 %>% 
+  dplyr::rename(Tree = SSS.tag_as, Year = year)
+
+# preapare gounping variables
+# make site a factor
+f_t_dat_ft19.21$Site <- as.factor(f_t_dat_ft19.21$Site) 
+f_t_dat_ft19.21$Year <- as.factor(f_t_dat_ft19.21$Year)
+
+
+# install.packages("sjPlot")
+library(sjPlot) # table functions
+
+
+#  Year as a random effect, however no variance in leaf between year, boundary (singular) fit: see help('isSingular') so it should be dropped
+fl.mixed.1 <- lmerTest::lmer(jul0.2_TGFT_d ~ average_minTdep_f + (1 | Year) + (1 | Site) + (1 | Site:Tree) , data = f_t_dat_ft19.21)
+fl.mixed.1 
+
+
+sjPlot::tab_model(fl.mixed.1,
+                                  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "Minimum temp departure (C)"),
+
+  # 2. Custom dependent variable label
+  dv.labels = c("flower emergence"),
+  show.aic = TRUE,
+
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+
+```
+
+```{r LMEM interaction between phenophase-temp}
+library(lme4)
+library(ggeffects)
+library(ggplot2)
+# look at how leaves and flowers are affect by temperature
+
+#  load data
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leafout-temp-dep-2019-20-21.revise.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+f_t_dat_ft19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/flower-tip-temp-dep-2019-20-21.revise.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+# create a shared dataset with departures
+leaves <- f_t_dat_lo19.21 %>% 
+  mutate(departure.p = jul0.5_TGLO_d, departure.t = average_minTdep_l, phenophase = "Leaf opening") %>% 
+    select(Site, SSS.tag_as, year , phenophase,  departure.p, departure.t) 
+
+flowers <- f_t_dat_ft19.21 %>% 
+   mutate(departure.p = jul0.2_TGFT_d, departure.t = average_minTdep_f, phenophase = "Flower emergence") %>% 
+    select(Site, SSS.tag_as, year, phenophase, departure.p, departure.t) 
+
+# link rows
+l.f.t.int <- flowers %>% 
+  rbind(leaves) %>% 
+dplyr::rename(Tree = SSS.tag_as, Year = year)
+
+#reorder zone levels
+l.f.t.int$phenophase<- factor(l.f.t.int$phenophase, levels= c("Leaf opening", 
+                            "Flower emergence"))
+
+# check col names
+colnames(flowers) == colnames(leaves)
+
+
+# look at how temp predicts phenolody with phenophase and interaction of temp on phenophase
+l.f.t.int.m <- lmerTest::lmer(departure.p ~ departure.t + phenophase + phenophase*departure.t + (1|Year) + (1 | Site) + (1 | Site:Tree) , REML =  FALSE, data = l.f.t.int)
+summary(l.f.t.int.m)
+l.f.t.int.m
+
+# create table
+sjPlot::tab_model(l.f.t.int.m,
+                                  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "Temperature departure (°C)", "Phenophase", "Temperature departure (°C) x Phenophase"),
+
+  # 2. Custom dependent variable label
+  dv.labels = c("Phenology departures (days)"),
+  show.aic = F,
+
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+```
+
+```{r table 2 grid}
+
+# sjPlot::tab_model(lo.mixed, fl.mixed.1,
+#                                   # 1. Custom predictor labels (must align with the order of coefficients)
+#   pred.labels = c("(Intercept)", "Minimum temp departure (°C)", "Minimum temp departure (°C)"),
+# 
+#   # 2. Custom dependent variable label
+#   dv.labels = c("Leaf opening \n departure (days)", "Flower emergence \n departure (days)"),
+#     show.aic = TRUE,
+# 
+#   # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+#   auto.label = FALSE
+# )
+
+sjPlot::tab_model(lo.mixed, fl.mixed.1, l.f.t.int.m,
+                                  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "Minimum temp departureL (°C)", "Minimum temp departureF (°C)", "Minimum temp departureLF (°C)", "Phenophase", "Temperature departure (°C) x Phenophase"),
+
+  # 2. Custom dependent variable label
+  dv.labels = c("Leaf opening \n departure (days)", "Flower emergence \n departure (days)", "Departure (days)"),
+    show.aic = TRUE,
+
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+```
+
+
+## Impervious surface relationship with phenology
+```{r LMM leaves - imp}
+
+library(lme4) # for lmer
+library(lmerTest) # for lmer p values based on degrees of freedom
+library(DHARMa)        # simulation-based residual checks (very good for mixed models)
+library(performance)
+
+
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leaf-predictors.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+f_t_dat_lo19.21 <- f_t_dat_lo19.21 %>% 
+  rename(Tree = SSS.tag_as, Year = year)
+
+# preapare gounping variables
+# make site a factor
+f_t_dat_lo19.21$Site <- as.factor(f_t_dat_lo19.21$Site) 
+f_t_dat_lo19.21$Year <- as.factor(f_t_dat_lo19.21$Year)
+
+# remove wonderland, union, bas1, 
+f_t_dat_lo19.21 <- f_t_dat_lo19.21 %>% 
+   filter(Site != "WOND", Site != "SUMA",Site != "UNIO",Site != "BAS1") 
+
+# YEAR and Tree and Site SHOWED no variation as a random effect, so dropped
+# temp NO REML , use maximum likihood (ML)
+lo.mixed.tl.1<- lmerTest::lmer(jul0.5_TGLO_d ~  pA250  + (1 | Year) + (1 | Site) + (1 | Site:Tree) , REML =  FALSE, data = f_t_dat_lo19.21)
+lo.mixed.tl.1
+summary(lo.mixed.tl.1)
+
+
+# temp NO REML , use maximum likihood (ML)
+lo.mixed.tl<- lmerTest::lmer(jul0.5_TGLO_d ~  pA250 + (1 | Site) , REML =  FALSE, data = f_t_dat_lo19.21)
+lo.mixed.tl
+summary(lo.mixed.tl)
+
+# see slope. The estimate is the Slope, which is the average change in the dependent variable (leaf open) for every one unit increase in the independent variable (temp). So for every 1 degree increase in average temp departure, leaf burst is 3.17 days earlier. 
+
+VarCorr(lo.mixed.tl)
+
+# Residuals vs fitted — look for no pattern, constant spread
+plot(lo.mixed.tl)
+
+# Q-Q plot of residuals — check normality - some S tailed a bit
+qqnorm(resid(lo.mixed.tl)); qqline(resid(lo.mixed.tl))
+
+# Use dharma to simulate residuals
+sim_res.l <- simulateResiduals(lo.mixed.tl, allow.new.levels = TRUE)
+plot(sim_res.l)
+
+# Specific tests
+testDispersion(sim_res.l)
+testOutliers(sim_res.l) #significant. We should Test if dropping the outliers and see if we get a similare result
+
+
+# can calculate the proportion of total variance attributable to each grouping level, to say X % of the variation in budburst timing that isn't explained by temp is due to the differences between sites, versus 15% duue to differences between trees within a site.
+vc.l <- as.data.frame(VarCorr(lo.mixed.tl))
+vc.l$vcov / sum(vc.l$vcov)   # proportion of variance per component
+
+# use performance package to calculate a marginal and conditional r2
+performance::r2(lo.mixed.tl)
+# Marginal R²: variance explained by fixed effects only (temperature)
+#Conditional R²: variance explained by fixed + random effects together
+
+# The gap between them tells you how much of your model's explanatory power comes from the site/tree structure versus temperature itself.
+
+
+AIC(lo.mixed.tl) # lower AIC better, When you fit a linear mixed-effects model, R defaults to REML (Restricted Maximum Likelihood) estimation because it provides unbiased estimates for variance components. However, you cannot compare AIC values between models with different fixed effects if they are fitted using REML.If you are comparing models with different fixed effect structures, you must set REML = FALSE (or use Maximum Likelihood, method = "ML") in your model function
+```
+
+```{r table- leaf imp mm results}
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leaf-predictors.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+f_t_dat_lo19.21 <- f_t_dat_lo19.21 %>% 
+  rename(Tree = SSS.tag_as, Year = year)
+
+# preapare gounping variables
+# make site a factor
+f_t_dat_lo19.21$Site <- as.factor(f_t_dat_lo19.21$Site) 
+f_t_dat_lo19.21$Year <- as.factor(f_t_dat_lo19.21$Year)
+
+# remove wonderland, union, bas1, 
+f_t_dat_lo19.21 <- f_t_dat_lo19.21 %>% 
+   filter(Site != "WOND", Site != "SUMA",Site != "UNIO",Site != "BAS1") 
+
+
+# install.packages("sjPlot")
+library(sjPlot) # table functions
+
+#  Year as a random effect, however no variance in leaf between year, boundary (singular) fit: see help('isSingular') so it should be dropped
+lo.mixed.1 <- lmerTest::lmer(jul0.5_TGLO_d ~ pA250 + (1 | Year) + (1 | Site) + (1 | Site:Tree) , data = f_t_dat_lo19.21)
+lo.mixed.1
+
+
+# redo temp and pheno with no year and site/tree in the model
+lo.mixed <- lmerTest::lmer(jul0.5_TGLO_d ~ pA250+ (1 | Site), data = f_t_dat_lo19.21)
+lo.mixed
+summary(lo.mixed)
+VarCorr(lo.mixed)
+
+
+sjPlot::tab_model(lo.mixed.1, lo.mixed, 
+                                  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "Impervious surface proportion (520m radius)"),
+
+  # 2. Custom dependent variable label
+  dv.labels = c("leaf opening","leaf opening"),
+    show.aic = TRUE,
+
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+
+# save this to show reviewers asking for year in the reviewer response
+
+# final table with temp (no year) and imp surface
+
+# example for adjusting the labels
+sjPlot::tab_model(lo.mixed,
+  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "minimum temp departure C"),
+
+  # 2. Custom dependent variable label
+  dv.labels = c("leaf opening"),
+    show.aic = TRUE,
+
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+
+```
+
+```{r LMM flowers- imp- SIG}
+
+library(lme4) # for lmer
+library(lmerTest) # for lmer p values based on degrees of freedom
+library(DHARMa)        # simulation-based residual checks (very good for mixed models)
+library(performance)
+
+# prep flower data
+
+f_t_dat_ft19.21  <- read.csv("data/outputs/combined-temp-pheno-dat/flower-predictors.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+f_t_dat_ft19.21  <- f_t_dat_ft19.21 %>% 
+  rename(Tree = SSS.tag_as, Year = year)
+
+# preapare gounping variables
+# make site a factor
+f_t_dat_ft19.21$Site <- as.factor(f_t_dat_ft19.21$Site) 
+f_t_dat_ft19.21$Year <- as.factor(f_t_dat_ft19.21$Year)
+
+# remove wonderland, union, bas1, 
+f_t_dat_ft19.21<- f_t_dat_ft19.21 %>% 
+   filter(Site != "WOND", Site != "SUMA",Site != "UNIO",Site != "BAS1") 
+
+# fl.mixed <- lmer(y ~ x + (1 | group), data = my_data)
+fl.mixed <- lmer(jul0.2_TGFT_d ~ pA250 + (1| Year) + (1 | Site) + (1 | Site:Tree), data = f_t_dat_ft19.21)
+
+fl.mixed
+summary(fl.mixed)
+
+VarCorr(fl.mixed)
+
+# interpretation: 
+# Site variance: how much budburst timing varies between sites, after accounting for temperature. Large relative to Tree:Site → site-level factors (soil, microclimate, elevation) matter a lot.
+ # in our case, the site explains more than the tree in a site, but not a ton more after accounting for temp. 
+# Tree:Site variance: how much individual trees differ from each other within the same site. Large relative to Site → individual tree genetics/exposure matter more than which site they're in.
+# Residual variance: leftover variation not explained by site, tree, or temperature — includes year-to-year noise, measurement error, unmeasured factors.
+
+# Residuals vs fitted — look for no pattern, constant spread
+plot(fl.mixed)
+
+# Q-Q plot of residuals — check normality - some S tailed a bit
+qqnorm(resid(fl.mixed)); qqline(resid(fl.mixed))
+
+#  the smallest and largest observations (left-hand and right-hand sides of the QQ-plot, respectively) have an s-tail, 
+# the smallest observations are smaller than you would expect from a normal distribution (i.e. the points are below the line on the QQ-plot). This means the lower tail of the data’s distribution has beenextended, relative to a normal distribution.
+# the largest observations are larger than you would expect from a normal distribution (i.e. the points are above the line on the QQ-plot). This means the upper tail of the data’s distribution has beenextended, relative to a normal distribution (https://www.ucd.ie/ecomodel/resources/examplesofquantile-quantileplots/)
+
+# Use dharma to simulate residuals
+sim_res <- simulateResiduals(fl.mixed, allow.new.levels = TRUE)
+plot(fl.mixed)
+
+# Specific tests
+# # Test for overdispersion or underdispersion
+# Simulation-based: It compares the standard deviation (or variance) of the observed scaled quantile residuals against the standard deviation of residuals generated from data simulated under the fitted model.Nonparametric: It avoids strict distributional or asymptotic assumptions by relying purely on the simulated residual distributions.Interpretation: A dispersion statistic close to 1.0 indicates proper dispersion (equidispersion), whereas values significantly greater than 1 suggest overdispersion (excess variance), and values lower than 1 suggest underdispersion. The accompanying p-value tests whether this deviation is statistically significant.
+
+testDispersion(sim_res)
+# not sig , so not over/unde dispersed
+
+
+testOutliers(sim_res)
+# sig outlier
+
+
+# can calculate the proportion of total variance attributable to each grouping level, to say X % of the variation in budburst timing that isn't explained by temp is due to the differences between sites, versus 15% duue to differences between trees within a site.
+vc.f <- as.data.frame(VarCorr(fl.mixed))
+vc.f$vcov / sum(vc.f$vcov)   # proportion of variance per component
+
+# use performance package to calculate a marginal and conditional r2
+performance::r2(fl.mixed)
+
+# Marginal R²: variance explained by fixed effects only (temperature)
+#Conditional R²: variance explained by fixed + random effects together
+
+# The gap between them tells you how much of your model's explanatory power comes from the site/tree structure versus temperature itself.
+
+AIC(fl.mixed) # lower AIC better, When you fit a linear mixed-effects model, R defaults to REML (Restricted Maximum Likelihood) estimation because it provides unbiased estimates for variance components. However, you cannot compare AIC values between models with different fixed effects if they are fitted using REML.If you are comparing models with different fixed effect structures, you must set REML = FALSE (or use Maximum Likelihood, method = "ML") in your model function
+```
+
+```{r table- flower imp  mm results}
+f_t_dat_ft19.21  <- read.csv("data/outputs/combined-temp-pheno-dat/flower-predictors.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+f_t_dat_ft19.21  <- f_t_dat_ft19.21 %>% 
+  rename(Tree = SSS.tag_as, Year = year)
+
+# preapare gounping variables
+# make site a factor
+f_t_dat_ft19.21$Site <- as.factor(f_t_dat_ft19.21$Site) 
+f_t_dat_ft19.21$Year <- as.factor(f_t_dat_ft19.21$Year)
+
+# remove wonderland, union, bas1, 
+f_t_dat_ft19.21<- f_t_dat_ft19.21 %>% 
+   filter(Site != "WOND", Site != "SUMA",Site != "UNIO",Site != "BAS1") 
+
+
+# install.packages("sjPlot")
+library(sjPlot) # table functions
+
+
+#  Year as a random effect, however no variance in leaf between year, boundary (singular) fit: see help('isSingular') so it should be dropped
+fl.mixed.1 <- lmerTest::lmer(jul0.2_TGFT_d ~ pA250 + (1 | Year) + (1 | Site) + (1 | Site:Tree) , data = f_t_dat_ft19.21)
+fl.mixed.1 
+
+
+sjPlot::tab_model(fl.mixed.1,
+                                  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "Impervious surface proportion"),
+
+  # 2. Custom dependent variable label
+  dv.labels = c("flower emergence"),
+  show.aic = TRUE,
+
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+
+```
+
+```{r table 3 imp grid}
+
+sjPlot::tab_model(lo.mixed, fl.mixed.1,
+                                  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "Impervious surface proportion (250m)", "Impervious surface proportion (250m)"),
+
+  # 2. Custom dependent variable label
+  dv.labels = c("Leaf opening", "Flower emergence"),
+    show.aic = TRUE,
+
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+
+```
+
+
+
+
+## Land-use zones relationships with phenology
+
+```{r zone LMEM leaves}
+
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leaf-predictors.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+f_t_dat_lo19.21 <- f_t_dat_lo19.21 %>% 
+  rename(Tree = SSS.tag_as, Year = year)
+
+# preapare gounping variables
+# make site a factor
+f_t_dat_lo19.21$Site <- as.factor(f_t_dat_lo19.21$Site) 
+f_t_dat_lo19.21$Year <- as.factor(f_t_dat_lo19.21$Year)
+f_t_dat_lo19.21$zone_nam_1 <- as.factor(f_t_dat_lo19.21$zone_nam_1)
+
+# set levels ()
+#reorder zone levels
+f_t_dat_lo19.21$zone_nam_1 <- factor(f_t_dat_lo19.21$zone_nam_1, levels= c("Business-district", 
+                            "Residential-high",
+                           "Residential-med",
+                           "Residential-low",
+                           "Park"))
+
+
+
+# remove wonderland, union, bas1, 
+f_t_dat_lo19.21 <- f_t_dat_lo19.21 %>% 
+   filter(Site != "WOND", Site != "SUMA",Site != "UNIO",Site != "BAS1") 
+
+# # ANOVA land use zone Year and tree at a site have no variation, so not including
+# lo.mixed.4<- lmerTest::lmer(jul0.5_TGLO_d ~ zone_nam_1 + (1| Year) + (1 | Site) + (1 | Site:Tree), REML =  FALSE, data = f_t_dat_lo19.21)
+# lo.mixed.4
+# summary(lo.mixed.4)
+
+# ANOVA land use zone
+lo.mixed.4<- lmerTest::lmer(jul0.5_TGLO_d ~ zone_nam_1 + (1 | Site), REML =  FALSE, data = f_t_dat_lo19.21)
+lo.mixed.4
+summary(lo.mixed.4)
+
+## S3 method for class 'merMod'
+model_performance(
+  lo.mixed.4,
+  metrics = "all",
+  estimator = "ML",
+  verbose = TRUE
+)
+
+performance_aic(lo.mixed.4, estimator = "ML")
+
+library(sjmisc)
+library(sjlabelled)
+library(performance)
+
+sjPlot::tab_model(lo.mixed.4,
+                                  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "Business district:Park", "Business district:Res. high","Business district:Res. low","Business district:Res. med"),
+
+  # 2. Custom dependent variable label
+  dv.labels = "leaf opening",
+  show.aic = TRUE,
+string.ci = "CI",
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+
+
+performance_aic(lo.mixed.4, estimator = "ML") # have to manually add this in
+
+VarCorr(lo.mixed.4)
+
+# Residuals vs fitted — look for no pattern, constant spread
+plot(lo.mixed.4)
+
+# Q-Q plot of residuals — check normality - some S tailed a bit
+qqnorm(resid(lo.mixed.4)); qqline(lo.mixed.4)
+
+# Use dharma to simulate residuals
+sim_res.l <- simulateResiduals(lo.mixed.4, allow.new.levels = TRUE)
+plot(sim_res.l) # The spread or dispersion of your scaled residuals differs significantly between at least one pair of groups.
+
+
+# # this might be showing a more complex structure than lme can handle
+#  Users often find that glmmTMB is less prone to singular fit or convergence warnings compared to lme4 under difficult data conditions. lme4 (lmer) uses REML by default for linear models, whereas glmmTMB uses Maximum Likelihood (ML) by default for all models. This can lead to slightly different AIC or log-likelihood values unless explicitly aligned. Choose glmmTMB if: You have zero-inflated data, overdispersion, custom correlation structures (autoregressive, spatial), or if lme4 throws persistent convergence errors or singular boundary warnings
+
+# Specific tests
+testDispersion(sim_res.l)
+testOutliers(sim_res.l)
+
+
+# can calculate the proportion of total variance attributable to each grouping level, to say X % of the variation in budburst timing that isn't explained by temp is due to the differences between sites, versus 15% duue to differences between trees within a site.
+vc.l <- as.data.frame(VarCorr(lo.mixed.4))
+vc.l$vcov / sum(vc.l$vcov)   # proportion of variance per component
+
+# use performance package to calculate a marginal and conditional r2
+performance::r2(lo.mixed.4)
+# Marginal R²: variance explained by fixed effects only (temperature)
+#Conditional R²: variance explained by fixed + random effects together
+
+# The gap between them tells you how much of your model's explanatory power comes from the site/tree structure versus temperature itself.
+
+
+AIC(lo.mixed.4) # lower AIC better, # 859
+
+
+
+# look at the post hoc test
+
+# install.packages("emmeans")
+library(emmeans)
+library(lme4)
+
+
+mod.emm <- emmeans(lo.mixed.4, ~ zone_nam_1)
+mod.emm
+pairwise = pairs(mod.emm, simple="zone_nam_1",adjust="tukey")
+pairwise
+
+# 3. Extract the pairwise contrasts into a standard data frame
+pairwise_df <- as.data.frame(pairwise)
+
+
+library(gt)
+
+pairwise_df %>%
+  gt() %>%
+  tab_header(
+    title = "Post-Hoc Pairwise Comparisons",
+    subtitle = "Adjusted via Tukey's HSD method"
+  ) %>%
+  fmt_number(
+    columns = c(estimate, SE, t.ratio),
+    decimals = 3
+  ) %>%
+  fmt_scientific(
+    columns = p.value,
+    rows = p.value < 0.001
+  ) %>%
+  cols_label(
+    contrast = "Comparison",
+    estimate = "Difference",
+    SE = "Std. Error",
+    df = "df",
+    t.ratio = "t",
+    p.value = "p-value"
+  )
+
+```
+
+```{r zone LMEM flowers}
+
+f_t_dat_fl19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/flower-predictors.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+f_t_dat_fl19.21 <- f_t_dat_fl19.21 %>% 
+  rename(Tree = SSS.tag_as, Year = year)
+
+# preapare gounping variables
+# make site a factor
+f_t_dat_fl19.21$Site <- as.factor(f_t_dat_fl19.21$Site) 
+f_t_dat_fl19.21$Year <- as.factor(f_t_dat_fl19.21$Year)
+
+# remove wonderland, union, bas1, 
+f_t_dat_fl19.21 <- f_t_dat_fl19.21 %>% 
+   filter(Site != "WOND", Site != "SUMA",Site != "UNIO",Site != "BAS1") 
+
+# # ANOVA land use zone Year and tree at a site have no variation, so not including
+# lo.mixed.4<- lmerTest::lmer(jul0.5_TGLO_d ~ zone_nam_1 + (1| Year) + (1 | Site) + (1 | Site:Tree), REML =  FALSE, data = f_t_dat_lo19.21)
+# lo.mixed.4
+# summary(lo.mixed.4)
+
+# ANOVA land use zone
+fl.mixed.4<- lmerTest::lmer(jul0.2_TGFT_d ~ zone_nam_1 + (1 | Year) + (1 | Site) + (1 | Site: Tree), REML =  FALSE, data = f_t_dat_fl19.21)
+fl.mixed.4
+summary(fl.mixed.4)
+
+sjPlot::tab_model(fl.mixed.4,
+                                  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "Zone: Buisness district: Park", "Zone: Buisness district: Res. high", "Zone: Buisness district: Res. low", "Zone: Buisness district: Res. med" ),
+
+  # 2. Custom dependent variable label
+  dv.labels = c("flower emergence"),
+  show.aic = TRUE,
+
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+
+VarCorr(fl.mixed.4)
+
+# Residuals vs fitted — look for no pattern, constant spread
+plot(fl.mixed.4)
+
+# Q-Q plot of residuals — check normality - some S tailed a bit
+qqnorm(resid(fl.mixed.4)); qqline(fl.mixed.4)
+
+# Use dharma to simulate residuals
+sim_res.l <- simulateResiduals(fl.mixed.4, allow.new.levels = TRUE)
+plot(sim_res.l) # The spread or dispersion of your scaled residuals differs significantly between at least one pair of groups.
+
+
+# # this might be showing a more complex structure than lme can handle
+#  Users often find that glmmTMB is less prone to singular fit or convergence warnings compared to lme4 under difficult data conditions. lme4 (lmer) uses REML by default for linear models, whereas glmmTMB uses Maximum Likelihood (ML) by default for all models. This can lead to slightly different AIC or log-likelihood values unless explicitly aligned. Choose glmmTMB if: You have zero-inflated data, overdispersion, custom correlation structures (autoregressive, spatial), or if lme4 throws persistent convergence errors or singular boundary warnings
+
+# Specific tests
+testDispersion(sim_res.l)
+testOutliers(sim_res.l)
+
+
+# can calculate the proportion of total variance attributable to each grouping level, to say X % of the variation in budburst timing that isn't explained by temp is due to the differences between sites, versus 15% duue to differences between trees within a site.
+vc.l <- as.data.frame(VarCorr(fl.mixed.4))
+vc.l$vcov / sum(vc.l$vcov)   # proportion of variance per component
+
+# use performance package to calculate a marginal and conditional r2
+performance::r2(fl.mixed.4)
+# Marginal R²: variance explained by fixed effects only (temperature)
+#Conditional R²: variance explained by fixed + random effects together
+
+# The gap between them tells you how much of your model's explanatory power comes from the site/tree structure versus temperature itself.
+
+
+AIC(fl.mixed.4) # lower AIC better, # 859
+
+
+
+# look at the post hoc test
+
+# install.packages("emmeans")
+library(emmeans)
+library(lme4)
+
+
+mod.emm <- emmeans(fl.mixed.4, ~ zone_nam_1)
+mod.emm
+pairwise = pairs(mod.emm, simple="zone_nam_1",adjust="tukey")
+pairwise
+
+# 3. Extract the pairwise contrasts into a standard data frame
+pairwise_df <- as.data.frame(pairwise)
+
+
+library(gt)
+
+pairwise_df %>%
+  gt() %>%
+  tab_header(
+    title = "Post-Hoc Pairwise Comparisons for leaf opening",
+    subtitle = "Adjusted via Tukey's HSD method"
+  ) %>%
+  fmt_number(
+    columns = c(estimate, SE, t.ratio),
+    decimals = 3
+  ) %>%
+  fmt_scientific(
+    columns = p.value,
+    rows = p.value < 0.001
+  ) %>%
+  cols_label(
+    contrast = "Comparison",
+    estimate = "Difference",
+    SE = "Std. Error",
+    df = "df",
+    t.ratio = "t",
+    p.value = "p-value"
+  )
+
+```
+
+```{r table 4 grid zone table}
+
+
+sjPlot::tab_model(lo.mixed.4, fl.mixed.4,
+                                  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "Zone: Business district: Park", "Zone: Business district: Residential-high", "Zone: Business district: Residential-low", "Zone: Business district: Residential-med" ),
+
+  # 2. Custom dependent variable label
+  dv.labels = c("leaf opening", "flower emergence"),
+  show.aic = TRUE,
+
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+
+# Manually change the AIC
+AIC(lo.mixed.4) # lower AIC better, # 859
+# [1] 841.7553
+
+AIC(fl.mixed.4)
+# [1] 903.9525
+
+```
+
+
+## 3.3. OTher predictors
+Light, elevation, tree age, size not sig 
+```{r SM 8 elevation, light, size - leaves}
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leaf-predictors.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+f_t_dat_lo19.21 <- f_t_dat_lo19.21 %>% 
+  rename(Tree = SSS.tag_as, Year = year)
+
+# preapare gounping variables
+# make site a factor
+f_t_dat_lo19.21$Site <- as.factor(f_t_dat_lo19.21$Site) 
+f_t_dat_lo19.21$Year <- as.factor(f_t_dat_lo19.21$Year)
+f_t_dat_fl19.21$zone_nam_1 <- as.factor(f_t_dat_fl19.21$zone_nam_1)
+# remove wonderland, union, bas1, 
+f_t_dat_lo19.21 <- f_t_dat_lo19.21 %>% 
+   filter(Site != "WOND", Site != "SUMA",Site != "UNIO",Site != "BAS1") 
+
+# no variation in phenology year to year for leaves
+# test with no year in the model# test with no yeayearr in the model
+lo.mixed.yr <- lmerTest::lmer(jul0.5_TGLO_d ~ average_minTdep_l + trunk_di_1 + tree_heigh + Elevation + rel_light_site + (1 | Site) + (1 | Site:Tree) , REML =  FALSE, data = f_t_dat_lo19.21)
+lo.mixed.yr
+summary(lo.mixed.yr) # Year and Site do not vary because temp, imp, dist city center, and zone are  not different by tree
+
+sjPlot::tab_model(lo.mixed.yr,
+                                  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "Temperture departure (°C)", "DBH (cm)", "Tree height (m)", "Elevation (m)", "Relative light (lumens) "),
+
+  # 2. Custom dependent variable label
+  dv.labels = c("leaf opening"),
+  show.aic = TRUE,
+
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+
+```
+only elevation sig for flowers, along with temp
+```{r SM 8 elevation, light, size  + flowers}
+
+f_t_dat_fl19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/flower-predictors.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+f_t_dat_fl19.21 <- f_t_dat_fl19.21 %>% 
+  rename(Tree = SSS.tag_as, Year = year)
+
+# preapare gounping variables
+# make site a factor
+f_t_dat_fl19.21$Site <- as.factor(f_t_dat_fl19.21$Site) 
+f_t_dat_fl19.21$Year <- as.factor(f_t_dat_fl19.21$Year)
+
+# remove wonderland, union, bas1, 
+f_t_dat_fl19.21 <- f_t_dat_fl19.21 %>% 
+   filter(Site != "WOND", Site != "SUMA",Site != "UNIO",Site != "BAS1") 
+
+# # ANOVA land use zone Year and tree at a site have no variation, so not including
+# lo.mixed.4<- lmerTest::lmer(jul0.5_TGLO_d ~ zone_nam_1 + (1| Year) + (1 | Site) + (1 | Site:Tree), REML =  FALSE, data = f_t_dat_lo19.21)
+# lo.mixed.4
+# summary(lo.mixed.4)
+
+# ANOVA land use zone
+fl.mixed.4<- lmerTest::lmer(jul0.2_TGFT_d ~average_minTdep_f + trunk_di_1 + tree_heigh + Elevation + rel_light_site +  (1 | Site) + (1 | Site:Tree), REML =  FALSE, data = f_t_dat_fl19.21)
+fl.mixed.4
+summary(fl.mixed.4)
+
+sjPlot::tab_model(fl.mixed.4,
+                                  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "Temperture departure (°C)", "DBH (cm)", "Tree height (m)", "Elevation (m)", "Relative light (lumens) "),
+  # 2. Custom dependent variable label
+  dv.labels = c("flower emergence"),
+  show.aic = TRUE,
+
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+
+
+```
+
+# looking other predictors of temp
+```{r temp-proxy-factors-sites}
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leaf-predictors.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+f_t_dat_lo19.21 <- f_t_dat_lo19.21 %>% 
+  rename(Tree = SSS.tag_as, Year = year)
+
+# preapare gounping variables
+# make site a factor
+f_t_dat_lo19.21$Site <- as.factor(f_t_dat_lo19.21$Site) 
+f_t_dat_lo19.21$Year <- as.factor(f_t_dat_lo19.21$Year)
+f_t_dat_fl19.21$zone_nam_1 <- as.factor(f_t_dat_fl19.21$zone_nam_1)
+# remove wonderland, union, bas1, 
+f_t_dat_lo19.21 <- f_t_dat_lo19.21 %>% 
+   filter(Site != "WOND", Site != "SUMA",Site != "UNIO",Site != "BAS1", second.tre == 1) 
+
+
+# no variation in phenology year to year for leaves
+# test with no year in the model# test with no yeayearr in the model
+lo.mixed.yr <- lmerTest::lmer(average_minTdep_l ~  pA250 + Elevation + Dist_center_pearl_m + Dist_center_28th_m + zone_nam_1 + (1 | Year) + (1 | Site), REML =  FALSE, data = f_t_dat_lo19.21)
+lo.mixed.yr
+
+summary(lo.mixed.yr) # Year and Site do not vary because temp, imp, dist city center, and zone are  not different by trees
+
+
+sjPlot::tab_model(lo.mixed.yr,
+                                  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "Proportion Impervious surface (m<sup>2</sup>)", "Elevation (m)", "Distance to city center (Pearl, m)", "Distance to city center (28th St, m)", "Zone - Business district: Park", "Zone - Business district: Residential-high", "Zone - Business district: Residential-low", "Zone - Business district: Residential-medium"),
+  digits = 4,
+
+  # 2. Custom dependent variable label
+  dv.labels = c("Temperature departure (°C)"),
+  show.aic = FALSE,
+
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+
+# Manually change the AIC
+AIC(lo.mixed.yr) # lower AIC better, # 859
+# 1] 803.3002
+
+# In a random effects or mixed-effects model table, ICC stands for the Intraclass Correlation Coefficient, which measures the proportion of total outcome variance that lies between groups or clusters rather than within them
+
+```
+
+```{r temp-proxy-factors-leaves}
+f_t_dat_lo19.21 <- read.csv("data/outputs/combined-temp-pheno-dat/leaf-predictors.csv",
+                     header = TRUE,
+                     stringsAsFactors = FALSE)
+
+f_t_dat_lo19.21 <- f_t_dat_lo19.21 %>% 
+  rename(Tree = SSS.tag_as, Year = year)
+
+# preapare gounping variables
+# make site a factor
+f_t_dat_lo19.21$Site <- as.factor(f_t_dat_lo19.21$Site) 
+f_t_dat_lo19.21$Year <- as.factor(f_t_dat_lo19.21$Year)
+f_t_dat_fl19.21$zone_nam_1 <- as.factor(f_t_dat_fl19.21$zone_nam_1)
+# remove wonderland, union, bas1, 
+f_t_dat_lo19.21 <- f_t_dat_lo19.21 %>% 
+   filter(Site != "WOND", Site != "SUMA",Site != "UNIO",Site != "BAS1", second.tre == 1) 
+
+
+# no variation in phenology year to year for leaves
+# test with no year in the model# test with no yeayearr in the model
+lo.mixed.yr <- lmerTest::lmer(jul0.5_TGLO_d ~  pA250 + Elevation + Dist_center_pearl_m + Dist_center_28th_m + zone_nam_1 + (1 | Year) + (1 | Site), REML =  FALSE, data = f_t_dat_lo19.21)
+lo.mixed.yr
+
+summary(lo.mixed.yr) # Year and Site do not vary because temp, imp, dist city center, and zone are  not different by trees
+
+
+sjPlot::tab_model(lo.mixed.yr,
+                                  # 1. Custom predictor labels (must align with the order of coefficients)
+  pred.labels = c("(Intercept)", "Proportion Impervious surface (m<sup>2</sup>)", "Elevation (m)", "Distance to city center (Pearl, m)", "Distance to city center (28th St, m)", "Zone - Business district: Park", "Zone - Business district: Residential-high", "Zone - Business district: Residential-low", "Zone - Business district: Residential-medium"),
+  digits = 4,
+
+  # 2. Custom dependent variable label
+  dv.labels = c("Temperature departure (°C)"),
+  show.aic = FALSE,
+
+  # 3. Prevent sjPlot from trying to auto-fetch labels from data attributes
+  auto.label = FALSE
+)
+
+# Manually change the AIC
+AIC(lo.mixed.yr) # lower AIC better, # 859
+# 1] 803.3002
+
+# In a random effects or mixed-effects model table, ICC stands for the Intraclass Correlation Coefficient, which measures the proportion of total outcome variance that lies between groups or clusters rather than within them
+
+```
