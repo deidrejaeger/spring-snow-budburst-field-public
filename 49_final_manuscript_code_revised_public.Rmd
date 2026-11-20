@@ -6,6 +6,12 @@ date: "2026-11-20"
 
 # Script to generate the results for the manuscript figures, tables, text for the field paper, and supplementary materials
 
+Published: https://www.sciencedirect.com/science/article/pii/S1618866726005194
+
+D.M. Jaeger, J.M Friedman, M.P. Paulsen, B.M. Miller, K.N. Suding, T.R. Seastedt, C.A. Wessman,
+Budburst in the city: Urbanization-induced differences in leaf and flower emergence in Boulder, Colorado,
+Urban Forestry & Urban Greening, 2026, https://doi.org/10.1016/j.ufug.2026.129779.
+
 # Last updated in Sep 2026 dataset following reviewer suggestions that keeps phenology separated by year and tree, so those can be random effects. 
 
 Table of contents
